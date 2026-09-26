@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ImportResult } from './types/domain';
 import { useNormalizationConfig } from './hooks/useNormalizationConfig';
 import { ListaProjetosScreen } from './screens/ListaProjetosScreen';
@@ -18,10 +18,11 @@ type View =
 function App() {
   const { config, erro } = useNormalizationConfig();
   const [view, setView] = useState<View>({ tipo: 'lista' });
+  const [armazenamentoPersistente, setArmazenamentoPersistente] = useState<boolean | null>(null);
 
-  useState(() => {
-    requestPersistentStorage();
-  });
+  useEffect(() => {
+    requestPersistentStorage().then(setArmazenamentoPersistente);
+  }, []);
 
   if (erro) {
     return <p className="p-4 font-bold text-red-700">Falha ao carregar configuração de normalização: {erro}</p>;
@@ -36,6 +37,7 @@ function App() {
         <ListaProjetosScreen
           onNovoProjeto={() => setView({ tipo: 'import' })}
           onAbrirProjeto={(projectId) => setView({ tipo: 'vistoria', projectId })}
+          armazenamentoPersistente={armazenamentoPersistente}
         />
       );
     case 'import':

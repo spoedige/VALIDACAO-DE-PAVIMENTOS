@@ -4,13 +4,14 @@ import { listProjects, type ProjetoComAtividade } from '../db/projectService';
 interface Props {
   onAbrirProjeto: (projectId: string) => void;
   onNovoProjeto: () => void;
+  armazenamentoPersistente: boolean | null;
 }
 
 function formatarData(iso: string): string {
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export function ListaProjetosScreen({ onAbrirProjeto, onNovoProjeto }: Props) {
+export function ListaProjetosScreen({ onAbrirProjeto, onNovoProjeto, armazenamentoPersistente }: Props) {
   const [projetos, setProjetos] = useState<ProjetoComAtividade[] | null>(null);
 
   useEffect(() => {
@@ -28,6 +29,12 @@ export function ListaProjetosScreen({ onAbrirProjeto, onNovoProjeto }: Props) {
           + Novo projeto
         </button>
       </div>
+
+      {armazenamentoPersistente !== null && (
+        <p className={`mb-3 text-xs font-bold ${armazenamentoPersistente ? 'text-emerald-700' : 'text-amber-700'}`}>
+          Armazenamento persistente: {armazenamentoPersistente ? 'concedido' : 'não concedido (dados podem ser apagados pelo navegador sob pressão de espaço)'}
+        </p>
+      )}
 
       {projetos === null && <p className="text-neutral-600">Carregando…</p>}
       {projetos?.length === 0 && (
