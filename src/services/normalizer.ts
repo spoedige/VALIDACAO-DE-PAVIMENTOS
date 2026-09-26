@@ -100,3 +100,32 @@ export function normalizeSolution(
 
   return unknown(categoriaPai, bruto);
 }
+
+export interface SubtipoDisponivel {
+  categoriaPai: CategoriaPai;
+  subtipoCodigo: string;
+  precisaEspessura: boolean;
+  label: string;
+}
+
+/**
+ * Deriva do próprio config quais subtipos existem — a UI nunca lista uma opção
+ * que o normalizador não saiba produzir. Editar o JSON de normalização também
+ * muda os chips disponíveis na tela, sem rebuild.
+ */
+export function catalogoSubtipos(config: NormalizationConfig): SubtipoDisponivel[] {
+  const out: SubtipoDisponivel[] = [];
+  for (const [categoriaPai, def] of Object.entries(config.categorias) as Array<[CategoriaPai, { regras: Regra[] } | undefined]>) {
+    for (const regra of def?.regras ?? []) {
+      if (regra.tipo === 'sigla') out.push({ categoriaPai, subtipoCodigo: regra.subtipoCodigo, precisaEspessura: false, label: regra.descricao ?? regra.subtipoCodigo });
+      else out.push({ categoriaPai, subtipoCodigo: regra.subtipoCodigo, precisaEspessura: true, label: regra.descricao ?? regra.subtipoCodigo });
+    }
+  }
+  const vistos = new Set<string>();
+  return out.filter((s) => {
+    const chaveVista = `${s.categoriaPai}:${s.subtipoCodigo}`;
+    if (vistos.has(chaveVista)) return false;
+    vistos.add(chaveVista);
+    return true;
+  });
+}
