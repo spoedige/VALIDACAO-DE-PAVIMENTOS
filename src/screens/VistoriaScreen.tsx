@@ -7,6 +7,9 @@ import { useWakeLock } from '../hooks/useWakeLock';
 import { FaixaCard } from '../components/FaixaCard';
 import { DrenoBar } from '../components/DrenoBar';
 import { AlteracaoBottomSheet } from '../components/AlteracaoBottomSheet';
+import { MiniUnifilar } from '../components/MiniUnifilar';
+import { ParametrosTable } from '../components/ParametrosTable';
+import { RotaPolyline } from '../components/RotaPolyline';
 
 interface Props {
   projectId: string;
@@ -22,6 +25,7 @@ export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Prop
   const [estacas, setEstacas] = useState<Estaca[] | null>(null);
   const [fieldLogs, setFieldLogs] = useState<Map<string, FieldLog>>(new Map());
   const [faixaEmEdicao, setFaixaEmEdicao] = useState<number | null>(null);
+  const [modo, setModo] = useState<'vistoria' | 'parametros'>('vistoria');
 
   useEffect(() => {
     getProject(projectId).then((p) => setProjeto(p ?? null));
@@ -72,6 +76,21 @@ export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Prop
         </button>
       </div>
 
+      <div className="flex gap-2">
+        <button
+          onClick={() => setModo('vistoria')}
+          className={`h-11 flex-1 rounded-lg font-bold ${modo === 'vistoria' ? 'bg-neutral-900 text-white' : 'border border-neutral-400 text-neutral-700'}`}
+        >
+          Vistoria
+        </button>
+        <button
+          onClick={() => setModo('parametros')}
+          className={`h-11 flex-1 rounded-lg font-bold ${modo === 'parametros' ? 'bg-neutral-900 text-white' : 'border border-neutral-400 text-neutral-700'}`}
+        >
+          Parâmetros
+        </button>
+      </div>
+
       <div className="rounded-lg border border-neutral-300 bg-white p-4">
         <div className="flex items-center justify-between">
           <span className="text-4xl font-black tabular-nums text-neutral-900">{estacaAtual.numeroEstaca}</span>
@@ -105,22 +124,31 @@ export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Prop
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto">
-        {estacaAtual.faixas.map((faixa) => {
-          const key = fieldLogKey(estacaAtual.id, faixa.numero);
-          const log = fieldLogs.get(key);
-          return (
-            <FaixaCard
-              key={faixa.numero}
-              numero={faixa.numero}
-              solucoesAtuais={log?.solucoesCampo ?? faixa.solucoesOriginais}
-              nota={log?.notaCampo}
-              onAlterar={() => setFaixaEmEdicao(faixa.numero)}
-            />
-          );
-        })}
-        <DrenoBar status={estacaAtual.dreno} />
-      </div>
+      {modo === 'vistoria' ? (
+        <>
+          <div className="flex gap-2 overflow-x-auto">
+            {estacaAtual.faixas.map((faixa) => {
+              const key = fieldLogKey(estacaAtual.id, faixa.numero);
+              const log = fieldLogs.get(key);
+              return (
+                <FaixaCard
+                  key={faixa.numero}
+                  numero={faixa.numero}
+                  solucoesAtuais={log?.solucoesCampo ?? faixa.solucoesOriginais}
+                  nota={log?.notaCampo}
+                  onAlterar={() => setFaixaEmEdicao(faixa.numero)}
+                />
+              );
+            })}
+            <DrenoBar status={estacaAtual.dreno} />
+          </div>
+
+          <MiniUnifilar estacas={estacas} estacaAtualIndex={gps.estacaAtualIndex} fieldLogs={fieldLogs} />
+          <RotaPolyline estacas={estacas} estacaAtualIndex={gps.estacaAtualIndex} />
+        </>
+      ) : (
+        <ParametrosTable estaca={estacaAtual} />
+      )}
 
       {faixaEditando && (
         <AlteracaoBottomSheet

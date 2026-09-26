@@ -19,7 +19,9 @@ export function SolutionBadge({ solucao }: { solucao: NormalizedSolution }) {
       className="inline-flex min-h-12 min-w-16 flex-col items-center justify-center rounded-md border-4 bg-white px-2 py-1"
       style={{ borderColor: cor }}
     >
-      <span className="text-base font-bold text-neutral-900">{solucao.normalizationStatus === 'unresolved' ? 'UNKNOWN' : solucao.subtipoCodigo}</span>
+      <span className={`font-bold text-neutral-900 ${solucao.subtipoCodigo.length > 6 ? 'text-[11px] leading-tight' : 'text-base'}`}>
+        {solucao.normalizationStatus === 'unresolved' ? 'UNKNOWN' : solucao.subtipoCodigo}
+      </span>
       {linha2 && <span className="text-xs text-neutral-600">{linha2}</span>}
     </span>
   );
