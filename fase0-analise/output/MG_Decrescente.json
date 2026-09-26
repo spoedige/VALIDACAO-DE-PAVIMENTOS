@@ -1,0 +1,273 @@
+{
+  "arquivo": "MG_Decrescente.xlsx",
+  "abasEncontradas": [
+    "Solução",
+    "Unifilar",
+    "Quantidades",
+    "Orientações de Preenchimento",
+    "Premissas",
+    "Orçamento",
+    "SGP-2"
+  ],
+  "abaUnifilarEncontrada": true,
+  "deteccaoCabecalho": {
+    "linhaFaixas": 6,
+    "linhaParamSol": 7,
+    "linhaNomesColuna": 8
+  },
+  "faixasNoCabecalho": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "secoesNaoDocumentadas": [
+    {
+      "texto": "Acost.",
+      "coluna": 123,
+      "letra": "DS"
+    },
+    {
+      "texto": "Dreno",
+      "coluna": 126,
+      "letra": "DV"
+    },
+    {
+      "texto": "2",
+      "coluna": 282,
+      "letra": "JV"
+    }
+  ],
+  "faixasDetectadas": [
+    {
+      "numero": 1,
+      "colunaInicio": 22,
+      "parametros": {
+        "IRI (m/km)": 22,
+        "% Defeitos": 23,
+        "ATR Máx": 24,
+        "O / P / R / D": 25,
+        "EX / AF / E": 26,
+        "HR (cm)": 27,
+        "D0 (0,01 mm)": 28,
+        "Rc (m)": 29,
+        "D120 (0,01 mm)": 30
+      },
+      "solucoes": {
+        "Estrutural": 31,
+        "FresagemFuncional": 32,
+        "FresagemEstrutural": 33,
+        "Selagem": 34,
+        "Microfres": 35,
+        "FresagemFina": 36,
+        "Revest": 37
+      }
+    },
+    {
+      "numero": 2,
+      "colunaInicio": 39,
+      "parametros": {
+        "IRI (m/km)": 39,
+        "% Defeitos": 40,
+        "ATR Máx": 41,
+        "O / P / R / D": 42,
+        "EX / AF / E": 43,
+        "HR (cm)": 44,
+        "D0 (0,01 mm)": 45,
+        "Rc (m)": 46,
+        "D120 (0,01 mm)": 47
+      },
+      "solucoes": {
+        "Estrutural": 48,
+        "FresagemFuncional": 49,
+        "FresagemEstrutural": 50,
+        "Selagem": 51,
+        "Microfres": 52,
+        "FresagemFina": 53,
+        "Revest": 54
+      }
+    },
+    {
+      "numero": 3,
+      "colunaInicio": 56,
+      "parametros": {
+        "IRI (m/km)": 56,
+        "% Defeitos": 57,
+        "ATR Máx": 58,
+        "O / P / R / D": 59,
+        "EX / AF / E": 60,
+        "HR (cm)": 61,
+        "D0 (0,01 mm)": 62,
+        "Rc (m)": 63,
+        "D120 (0,01 mm)": 64
+      },
+      "solucoes": {
+        "Estrutural": 65,
+        "FresagemFuncional": 66,
+        "FresagemEstrutural": 67,
+        "Selagem": 68,
+        "Microfres": 69,
+        "FresagemFina": 70,
+        "Revest": 71
+      }
+    },
+    {
+      "numero": 4,
+      "colunaInicio": 73,
+      "parametros": {
+        "IRI (m/km)": 73,
+        "% Defeitos": 74,
+        "ATR Máx": 75,
+        "O / P / R / D": 76,
+        "EX / AF / E": 77,
+        "HR (cm)": 78,
+        "D0 (0,01 mm)": 79,
+        "Rc (m)": 80,
+        "D120 (0,01 mm)": 81
+      },
+      "solucoes": {
+        "Estrutural": 82,
+        "FresagemFuncional": 83,
+        "FresagemEstrutural": 84,
+        "Selagem": 85,
+        "Microfres": 86,
+        "FresagemFina": 87,
+        "Revest": 88
+      }
+    },
+    {
+      "numero": 5,
+      "colunaInicio": 90,
+      "parametros": {
+        "IRI (m/km)": 90,
+        "% Defeitos": 91,
+        "ATR Máx": 92,
+        "O / P / R / D": 93,
+        "EX / AF / E": 94,
+        "HR (cm)": 95,
+        "D0 (0,01 mm)": 96,
+        "Rc (m)": 97,
+        "D120 (0,01 mm)": 98
+      },
+      "solucoes": {
+        "Estrutural": 99,
+        "FresagemFuncional": 100,
+        "FresagemEstrutural": 101,
+        "Selagem": 102,
+        "Microfres": 103,
+        "FresagemFina": 104,
+        "Revest": 105
+      }
+    },
+    {
+      "numero": 6,
+      "colunaInicio": 107,
+      "parametros": {
+        "IRI (m/km)": 107,
+        "% Defeitos": 108,
+        "ATR Máx": 109,
+        "O / P / R / D": 110,
+        "EX / AF / E": 111,
+        "HR (cm)": 112,
+        "D0 (0,01 mm)": 113,
+        "Rc (m)": 114,
+        "D120 (0,01 mm)": 115
+      },
+      "solucoes": {
+        "Estrutural": 116,
+        "FresagemFuncional": 117,
+        "FresagemEstrutural": 118,
+        "Selagem": 119,
+        "Microfres": 120,
+        "FresagemFina": 121,
+        "Revest": 122
+      }
+    }
+  ],
+  "colunasFixas": {
+    "hodometroContinuo": 14,
+    "hodometroMarco": 15,
+    "latitude": 16,
+    "longitude": 17,
+    "tipoSecao": 18,
+    "marcoKm": 19,
+    "observacao": 20
+  },
+  "colunaDreno": 126,
+  "linhaInicioDados": 11,
+  "totalEstacas": 5540,
+  "coordenadas": {
+    "validas": 5540,
+    "invalidas": 0
+  },
+  "formulasNaoAvaliadas": 0,
+  "drenoValoresDistintos": {
+    "P": 135,
+    "R": 993
+  },
+  "tipoSecaoPreenchidas": 0,
+  "acostamentoForaDeEscopo": {
+    "colunaMicro": 123,
+    "colunaGap": 124,
+    "microPreenchidas": 15,
+    "gapPreenchidas": 45
+  },
+  "hodometroContinuo": {
+    "primeiro": 0,
+    "ultimo": 179.98,
+    "direcaoNumerica": "ascendente"
+  },
+  "hodometroInconsistencias": 0,
+  "intervaloMedioEstacas": 0.032493229824878136,
+  "solucoesPorCategoria": {
+    "Estrutural": {
+      "totalPreenchidas": 10,
+      "valoresDistintos": {
+        "STR:RP4,0": 6,
+        "STR:RP7,0": 4
+      }
+    },
+    "FresagemFuncional": {
+      "totalPreenchidas": 1787,
+      "valoresDistintos": {
+        "NUM:1": 1787
+      }
+    },
+    "FresagemEstrutural": {
+      "totalPreenchidas": 1068,
+      "valoresDistintos": {
+        "NUM:1": 1068
+      }
+    },
+    "Selagem": {
+      "totalPreenchidas": 0,
+      "valoresDistintos": {}
+    },
+    "Microfres": {
+      "totalPreenchidas": 1505,
+      "valoresDistintos": {
+        "STR:MF": 1505
+      }
+    },
+    "FresagemFina": {
+      "totalPreenchidas": 0,
+      "valoresDistintos": {}
+    },
+    "Revest": {
+      "totalPreenchidas": 1704,
+      "valoresDistintos": {
+        "STR:M": 1614,
+        "NUM:3": 90
+      }
+    }
+  },
+  "metadataLocal": "BR-050/MG - Decrescente - km 0,000 ao km 180,000",
+  "metadataLocalParseada": {
+    "rodovia": "BR-050/MG",
+    "sentido": "Decrescente",
+    "kmInicial": "0,000",
+    "kmFinal": "180,000"
+  }
+}
