@@ -20,6 +20,28 @@ interface Props {
 
 const PRECISAO_LABEL = { boa: 'boa', moderada: 'moderada', baixa: 'baixa' } as const;
 
+/**
+ * Critério de aceitação 2: até 4 faixas, todas visíveis juntas sem rolagem
+ * lateral; com 5 ou 6, todas continuam acessíveis (cards mais compactos),
+ * nunca escondendo uma faixa ou exigindo rolagem horizontal da página. Em
+ * telas estreitas (celular), 5-6 faixas quebram em 2 linhas de 3; a partir de
+ * `sm` (mais espaço horizontal, ex: tablet) cabem todas numa linha só.
+ */
+// Classes escritas por extenso (não interpoladas): o Tailwind v4 só gera CSS
+// para strings literais encontradas no código-fonte, uma classe montada via
+// `grid-cols-${n}` em runtime nunca vira regra CSS nenhuma.
+const GRID_FAIXAS_CLASSNAME: Record<number, string> = {
+  1: 'grid gap-2 grid-cols-1',
+  2: 'grid gap-2 grid-cols-2',
+  3: 'grid gap-2 grid-cols-3',
+  4: 'grid gap-2 grid-cols-4',
+  5: 'grid gap-2 grid-cols-3 sm:grid-cols-5',
+  6: 'grid gap-2 grid-cols-3 sm:grid-cols-6',
+};
+function gridFaixasClassName(quantidade: number): string {
+  return GRID_FAIXAS_CLASSNAME[quantidade] ?? 'grid gap-2 grid-cols-3 sm:grid-cols-6';
+}
+
 export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Props) {
   const [projeto, setProjeto] = useState<Projeto | null>(null);
   const [estacas, setEstacas] = useState<Estaca[] | null>(null);
@@ -126,20 +148,22 @@ export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Prop
 
       {modo === 'vistoria' ? (
         <>
-          <div className="flex gap-2 overflow-x-auto">
-            {estacaAtual.faixas.map((faixa) => {
-              const key = fieldLogKey(estacaAtual.id, faixa.numero);
-              const log = fieldLogs.get(key);
-              return (
-                <FaixaCard
-                  key={faixa.numero}
-                  numero={faixa.numero}
-                  solucoesAtuais={log?.solucoesCampo ?? faixa.solucoesOriginais}
-                  nota={log?.notaCampo}
-                  onAlterar={() => setFaixaEmEdicao(faixa.numero)}
-                />
-              );
-            })}
+          <div className="flex gap-2">
+            <div className={`min-w-0 flex-1 ${gridFaixasClassName(estacaAtual.faixas.length)}`}>
+              {estacaAtual.faixas.map((faixa) => {
+                const key = fieldLogKey(estacaAtual.id, faixa.numero);
+                const log = fieldLogs.get(key);
+                return (
+                  <FaixaCard
+                    key={faixa.numero}
+                    numero={faixa.numero}
+                    solucoesAtuais={log?.solucoesCampo ?? faixa.solucoesOriginais}
+                    nota={log?.notaCampo}
+                    onAlterar={() => setFaixaEmEdicao(faixa.numero)}
+                  />
+                );
+              })}
+            </div>
             <DrenoBar status={estacaAtual.dreno} />
           </div>
 
