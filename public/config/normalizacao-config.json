@@ -1,0 +1,42 @@
+{
+  "_comentario": "Tabela de normalização de soluções, separada do código da interface. Editável sem rebuild (arquivo estático servido pelo Vercel). Cada regra é escopada à sua categoria-pai — o mesmo código bruto nunca é resolvido por coincidência com outra categoria. Regras baseadas apenas em valores confirmados nos arquivos reais (ver fase0-analise/RELATORIO.md) e nos códigos oficiais da paleta do documento; nada aqui foi inventado.",
+  "categorias": {
+    "Estrutural": {
+      "regras": [
+        { "tipo": "prefixoComEspessura", "prefixo": "RP", "subtipoCodigo": "RPX", "descricao": "Reparo Profundo" },
+        { "tipo": "prefixoComEspessura", "prefixo": "RE", "subtipoCodigo": "REX", "descricao": "Reconstrução" }
+      ]
+    },
+    "FresagemFuncional": {
+      "regras": [
+        { "tipo": "numeroPuro", "subtipoCodigo": "FresagemFuncional", "descricao": "Fresagem Funcional (espessura em cm)" }
+      ]
+    },
+    "FresagemEstrutural": {
+      "regras": [
+        { "tipo": "numeroPuro", "subtipoCodigo": "FresagemEstrutural", "descricao": "Fresagem Estrutural (espessura em cm)" }
+      ]
+    },
+    "Selagem": {
+      "regras": [
+        { "tipo": "sigla", "valor": "ST", "subtipoCodigo": "ST", "descricao": "Selagem de Trincas" }
+      ]
+    },
+    "Microfres": {
+      "regras": [
+        { "tipo": "sigla", "valor": "MF", "subtipoCodigo": "MFS", "descricao": "Microfresagem (sigla real 'MF' mapeada para o código oficial da legenda 'MFS')" },
+        { "tipo": "sigla", "valor": "MFS", "subtipoCodigo": "MFS", "descricao": "Microfresagem" }
+      ]
+    },
+    "FresagemFina": {
+      "regras": [
+        { "tipo": "sigla", "valor": "FF", "subtipoCodigo": "FF", "descricao": "Fresagem Fina" }
+      ]
+    },
+    "Revest": {
+      "regras": [
+        { "tipo": "sigla", "valor": "M", "subtipoCodigo": "M", "descricao": "Microrrevest. Asfáltico à Frio (Micro)" }
+      ]
+    }
+  }
+}

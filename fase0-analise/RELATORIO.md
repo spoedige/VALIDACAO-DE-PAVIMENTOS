@@ -66,6 +66,25 @@ completa em `output/MG_Crescente.json` e `output/MG_Decrescente.json`.
 | Fórmulas não avaliadas | 0 | 0 |
 | Coordenadas inválidas | 0 | 0 |
 
+## Bug crítico encontrado ao validar o excelAdapter de produção contra os 2 arquivos reais
+`XLSX.read(arrayBuffer, {type:'array'})` faz detecção automática de tipo
+internamente checando `data instanceof ArrayBuffer`. Isso falha silenciosamente
+(sem lançar exceção) quando o `ArrayBuffer` foi criado em outro realm/contexto
+JS do que o código que chama `XLSX.read` — cenário real em Web Workers, iframes,
+e (confirmado na prática) em ambiente de teste jsdom. O resultado não é um erro
+claro: o parser cai num fallback errado e devolve uma aba fantasma "Sheet1"
+vazia, silenciosamente — exatamente o tipo de falha silenciosa que a seção 3
+do documento pede para nunca acontecer ("se a estrutura não for reconhecida,
+mostrar erro claro"). Corrigido convertendo explicitamente para `Uint8Array`
+antes de chamar `XLSX.read`, o que contorna a detecção automática (frágil)
+inteiramente. Validado depois disso ponta a ponta contra os 2 arquivos .xlsx
+reais (não só o fixture sintético dos testes automatizados) — resultado:
+`canProceed: true`, 5540 estacas nos dois, faixas [1,2] no Crescente e [1,2,3]
+no Decrescente (bate exatamente com o texto do documento original), sentido/
+rodovia/km corretos vindos do texto "Local", avisos corretos de solução
+`unresolved` (150 no Crescente, 90 no Decrescente, todos o valor "3" de
+Revest.) e de intervalo irregular entre estacas.
+
 ## Nota de segurança
 O pacote `xlsx` publicado no npm (SheetJS) tem 2 CVEs conhecidas sem correção
 (prototype pollution + ReDoS). Como o app aceita arquivos `.xlsx` de qualquer
