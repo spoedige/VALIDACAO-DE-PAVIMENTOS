@@ -11,6 +11,7 @@ import type {
   ValidationIssue,
 } from '../types/domain';
 import { normalizeSolution, type NormalizationConfig } from './normalizer';
+import { sha256Hex } from './hash';
 
 // Camada "Excel Adapter": única parte do app que conhece o layout da planilha.
 // Uma futura mudança de layout só deve exigir ajustar este arquivo (seção 12).
@@ -75,11 +76,6 @@ function cellAt(ws: XLSX.WorkSheet, r: number, c: number) {
 function parseNumeroBr(texto: string): number | null {
   const n = Number(texto.trim().replace(',', '.'));
   return Number.isFinite(n) ? n : null;
-}
-
-async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', buffer);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 function bloqueante(code: string, message: string, details?: Record<string, unknown>): ValidationIssue {
