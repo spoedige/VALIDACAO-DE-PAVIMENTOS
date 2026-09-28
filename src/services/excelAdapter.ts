@@ -304,6 +304,19 @@ export async function importExcelFile(arrayBuffer: ArrayBuffer, fileName: string
     issues.push(aviso('hodometro-irregular', `${inconsistencias} inversão(ões) pontual(is) no hodômetro.`));
   }
 
+  // duplicidade impossível: mesma posição de hodômetro contínuo em mais de uma
+  // estaca quebraria a suposição de progressão monotônica que o motor de GPS
+  // depende (seção 11 do prompt de atualização de UX) — avisar antes de campo.
+  const hodometrosVistos = new Set<number>();
+  let duplicidades = 0;
+  for (const e of estacas) {
+    if (hodometrosVistos.has(e.hodometroContinuo)) duplicidades++;
+    hodometrosVistos.add(e.hodometroContinuo);
+  }
+  if (duplicidades > 0) {
+    issues.push(aviso('hodometro-duplicado', `${duplicidades} estaca(s) com hodômetro contínuo duplicado — pode confundir a associação GPS→estaca em campo.`));
+  }
+
   const intervaloMedio = intervalos.length ? intervalos.reduce((a, b) => a + b, 0) / intervalos.length : null;
   const intervaloMediano = intervalos.length ? [...intervalos].sort((a, b) => a - b)[Math.floor(intervalos.length / 2)] : null;
   if (intervaloMediano && intervalos.some((i) => i > intervaloMediano * INTERVALO_IRREGULAR_RATIO)) {

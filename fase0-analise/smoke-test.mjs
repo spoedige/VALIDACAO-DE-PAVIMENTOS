@@ -38,9 +38,16 @@ console.log('   Mostra estaca "0+0"?', estacaTexto.includes('0+0'));
 console.log('   Mostra "Faixa 1"?', estacaTexto.includes('Faixa 1'));
 await page.screenshot({ path: '/tmp/claude-0/-home-user-VALIDACAO-DE-PAVIMENTOS/9340ed7f-365f-5137-954e-4d846c5d56f4/scratchpad/screenshot-modo-vistoria.png' });
 
-await page.click('text=+20m');
-await page.waitForTimeout(300);
-console.log('5. Botão +20m clicado sem erro');
+// -20m/+20m foram removidos (atualização de UX, seção 2/11): navegação manual
+// de estaca ativa não existe mais, só a consulta por toque na régua vertical.
+const regua = page.locator('[aria-label*="Régua"]');
+const reguaBox = await regua.boundingBox();
+if (reguaBox) {
+  await page.mouse.click(reguaBox.x + reguaBox.width / 2, reguaBox.y + reguaBox.height * 0.3);
+  await page.waitForSelector('text=Consultando estaca', { timeout: 5000 });
+  console.log('5. Toque na régua abriu modo de consulta (substituiu +20m/-20m)');
+  await page.click('text=Voltar ao GPS');
+}
 
 const botoesAlterar = await page.$$('text=Alterar');
 if (botoesAlterar.length > 0) {
@@ -68,7 +75,9 @@ console.log('8. Modo Parâmetros (tabela transposta) carregou OK');
 await page.screenshot({ path: '/tmp/claude-0/-home-user-VALIDACAO-DE-PAVIMENTOS/9340ed7f-365f-5137-954e-4d846c5d56f4/scratchpad/screenshot-parametros.png' });
 
 await page.click('text=Vistoria');
-await page.waitForSelector('text=Faixa 1');
+// "Faixa 1" some encolhido pra "F1" em telas estreitas (seção 9.5) — o texto
+// completo ainda existe no DOM (oculto por CSS), só não fica visível aqui.
+await page.waitForSelector('text=F1');
 console.log('9. Voltou pro Modo Vistoria (mini-unifilar + rota) OK');
 await page.screenshot({ path: '/tmp/claude-0/-home-user-VALIDACAO-DE-PAVIMENTOS/9340ed7f-365f-5137-954e-4d846c5d56f4/scratchpad/screenshot-vistoria-completo.png' });
 

@@ -3,26 +3,31 @@ import { corSolucao } from '../config/paleta';
 
 function formatarComplementar(valor: number | undefined): string | null {
   if (valor === undefined) return null;
-  return `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} cm`;
+  return `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}cm`;
 }
 
-/** Badge de duas linhas — seção 7: código em cima, espessura/percentual embaixo,
- * fundo claro com borda espessa na cor oficial (nunca fundo sólido colorido). */
+/**
+ * Chip compacto de uma linha só (seção 10 da atualização de UX): código +
+ * espessura entre parênteses/traço quando couber, ex: "Fres. Func. · 4,0cm".
+ * Badge = informação, botão = ação — por isso saturação e borda ficam mais
+ * discretas que o botão "Alterar" (borda fina de 1-2px, não 4px; sem
+ * preenchimento saturado), não só a fonte menor.
+ */
 export function SolutionBadge({ solucao }: { solucao: NormalizedSolution }) {
-  const { label, cor } = corSolucao(solucao.categoriaPai, solucao.subtipoCodigo);
-  const linha2 = solucao.normalizationStatus === 'unresolved' ? String(solucao.valorBruto) : formatarComplementar(solucao.valorComplementar);
-  const titulo = solucao.normalizationStatus === 'unresolved' ? `Não reconhecido — valor original: ${solucao.valorBruto}` : label;
+  const { labelCurto, label, cor } = corSolucao(solucao.categoriaPai, solucao.subtipoCodigo);
+  const unresolved = solucao.normalizationStatus === 'unresolved';
+  const complementar = unresolved ? String(solucao.valorBruto) : formatarComplementar(solucao.valorComplementar);
+  const titulo = unresolved ? `Não reconhecido — valor original: ${solucao.valorBruto}` : label;
 
   return (
     <span
       title={titulo}
-      className="inline-flex min-h-12 min-w-16 flex-col items-center justify-center rounded-md border-4 bg-white px-2 py-1"
+      className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-full border bg-white px-2 text-sm font-bold text-neutral-800"
       style={{ borderColor: cor }}
     >
-      <span className={`font-bold text-neutral-900 ${solucao.subtipoCodigo.length > 6 ? 'text-[11px] leading-tight' : 'text-base'}`}>
-        {solucao.normalizationStatus === 'unresolved' ? 'UNKNOWN' : solucao.subtipoCodigo}
-      </span>
-      {linha2 && <span className="text-xs text-neutral-600">{linha2}</span>}
+      <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cor }} />
+      {unresolved ? 'UNKNOWN' : labelCurto}
+      {complementar && <span className="font-normal text-neutral-500">· {complementar}</span>}
     </span>
   );
 }

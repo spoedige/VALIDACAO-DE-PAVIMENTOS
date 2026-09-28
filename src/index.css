@@ -6,6 +6,16 @@
   color-scheme: light;
 }
 
+/* Identidade visual inspirada na planilha original (seção 8 da atualização de
+   UX): ocre/bronze escurecido, não o dourado puro da planilha (#FFC000),
+   que tem contraste baixo demais sob sol forte. Uso: acabamento (títulos de
+   seção, barra de cabeçalho, divisores) — nunca pra indicar solução/status,
+   que continua só na paleta de normalizacao-config.json. */
+@theme {
+  --color-ocre: #9a6700;
+  --color-ocre-dark: #855300;
+}
+
 html,
 body,
 #root {
