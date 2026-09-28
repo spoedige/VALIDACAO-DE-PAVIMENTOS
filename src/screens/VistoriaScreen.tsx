@@ -1,20 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Estaca, FieldLog, NormalizedSolution, Projeto } from '../types/domain';
+import type { Estaca, FieldChangeHistoryEntry, FieldLog, NormalizedSolution, Projeto } from '../types/domain';
 import type { NormalizationConfig } from '../services/normalizer';
-import { getProject, getStations, getFieldLogsMap, applyFieldChange, fieldLogKey, requestPersistentStorage } from '../db/projectService';
+import {
+  getProject,
+  getStations,
+  getFieldLogsMap,
+  applyFieldChange,
+  fieldLogKey,
+  requestPersistentStorage,
+  getFieldChangeHistoryByProject,
+  reverterEvento,
+} from '../db/projectService';
 import { useGps, MENSAGEM_PERMISSAO_NEGADA } from '../hooks/useGps';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { FaixaCard } from '../components/FaixaCard';
 import { AlteracaoBottomSheet } from '../components/AlteracaoBottomSheet';
+import { AlteracoesTab } from '../components/AlteracoesTab';
 import { VerticalRuler } from '../components/VerticalRuler';
 import { ParametrosTable } from '../components/ParametrosTable';
 import { DashboardScreen } from './DashboardScreen';
 import { SolutionBadge } from '../components/SolutionBadge';
 import { CORES_DRENO } from '../config/paleta';
+import type { LimiaresToleranciaConfig } from '../services/tolerancia';
 
 interface Props {
   projectId: string;
   config: NormalizationConfig;
+  limiaresTolerancia: LimiaresToleranciaConfig | null;
   onVoltar: () => void;
   onExportar: (projectId: string) => void;
 }
@@ -40,18 +52,37 @@ function gridFaixasClassName(quantidade: number): string {
   return GRID_FAIXAS_CLASSNAME[quantidade] ?? 'grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
 }
 
-export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Props) {
+// Painel de consulta (item 6): colunas de largura FIXA e igual (faixas + 1
+// pro dreno) — nome longo de solução trunca/quebra dentro da própria coluna,
+// nunca empurra as vizinhas nem desloca a posição do dreno. `grid-cols-N`
+// já usa `minmax(0, 1fr)` pra cada trilha, então nenhuma coluna cresce além
+// da fração que lhe cabe, seja qual for o conteúdo.
+const GRID_CONSULTA_CLASSNAME: Record<number, string> = {
+  2: 'grid grid-cols-2 gap-2',
+  3: 'grid grid-cols-3 gap-2',
+  4: 'grid grid-cols-4 gap-2',
+  5: 'grid grid-cols-5 gap-1.5',
+  6: 'grid grid-cols-6 gap-1.5',
+  7: 'grid grid-cols-7 gap-1',
+};
+function gridConsultaClassName(numFaixas: number): string {
+  return GRID_CONSULTA_CLASSNAME[numFaixas + 1] ?? 'grid grid-cols-7 gap-1';
+}
+
+export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar, onExportar }: Props) {
   const [projeto, setProjeto] = useState<Projeto | null>(null);
   const [estacas, setEstacas] = useState<Estaca[] | null>(null);
   const [fieldLogs, setFieldLogs] = useState<Map<string, FieldLog>>(new Map());
   const [faixaEmEdicao, setFaixaEmEdicao] = useState<number | null>(null);
-  const [modo, setModo] = useState<'vistoria' | 'dashboard' | 'parametros'>('vistoria');
+  const [modo, setModo] = useState<'vistoria' | 'dashboard' | 'parametros' | 'alteracoes'>('vistoria');
   const [estacaConsultadaIndex, setEstacaConsultadaIndex] = useState<number | null>(null);
+  const [historico, setHistorico] = useState<FieldChangeHistoryEntry[]>([]);
 
   useEffect(() => {
     getProject(projectId).then((p) => setProjeto(p ?? null));
     getStations(projectId).then((e) => setEstacas(e.sort((a, b) => a.id - b.id)));
     getFieldLogsMap(projectId).then(setFieldLogs);
+    getFieldChangeHistoryByProject(projectId).then(setHistorico);
   }, [projectId]);
 
   // seção 2 da atualização de UX: solicitar persistência ao entrar na tela de
@@ -75,6 +106,7 @@ export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Prop
 
   async function recarregarLogs() {
     setFieldLogs(await getFieldLogsMap(projectId));
+    setHistorico(await getFieldChangeHistoryByProject(projectId));
   }
 
   async function confirmarAlteracao(faixaNumero: number, novasSolucoes: NormalizedSolution[], nota?: string) {
@@ -90,8 +122,11 @@ export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Prop
     await recarregarLogs();
   }
 
-  const faixaEditando = faixaEmEdicao != null ? estacaAtiva.faixas.find((f) => f.numero === faixaEmEdicao) : undefined;
-  const logEditando = faixaEmEdicao != null ? fieldLogs.get(fieldLogKey(estacaAtiva.id, faixaEmEdicao)) : undefined;
+  async function reverter(eventoId: number) {
+    await reverterEvento(eventoId);
+    await recarregarLogs();
+  }
+
   const emConsulta = estacaConsultadaIndex != null && estacaConsultadaIndex !== gps.estacaAtivaIndex;
   const estacaConsultada = emConsulta ? estacas[estacaConsultadaIndex!] : null;
 
@@ -107,14 +142,25 @@ export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Prop
         </button>
       </header>
 
+      {/* item 5: 4ª aba "Alterações" — com 4 abas em 375px, reduz padding/fonte
+          em vez de deixar alguma sumir ou entrar em scroll horizontal
+          (mesma regra das 3 abas da rodada anterior, só mais apertada). */}
       <nav className="flex gap-1">
-        {(['vistoria', 'dashboard', 'parametros'] as const).map((m) => (
+        {(['vistoria', 'dashboard', 'parametros', 'alteracoes'] as const).map((m) => (
           <button
             key={m}
             onClick={() => setModo(m)}
-            className={`h-9 flex-1 rounded-lg text-xs font-bold sm:text-sm ${modo === m ? 'bg-neutral-900 text-white' : 'border border-neutral-400 text-neutral-700'}`}
+            className={`h-9 flex-1 rounded-lg px-1 text-[11px] font-bold sm:text-sm ${modo === m ? 'bg-neutral-900 text-white' : 'border border-neutral-400 text-neutral-700'}`}
           >
-            {m === 'vistoria' ? 'Vistoria' : m === 'dashboard' ? 'Dashboard' : 'Parâmetros'}
+            {m === 'vistoria'
+              ? 'Vistoria'
+              : m === 'dashboard'
+                ? 'Dashboard'
+                : m === 'parametros'
+                  ? 'Parâmetros'
+                  : historico.length > 0
+                    ? `Alterações (${historico.filter((h) => !h.revertidoEm).length})`
+                    : 'Alterações'}
           </button>
         ))}
       </nav>
@@ -138,24 +184,35 @@ export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Prop
               Voltar ao GPS
             </button>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className={gridConsultaClassName(estacaConsultada.faixas.length)}>
             {estacaConsultada.faixas.map((f) => {
               const log = fieldLogs.get(fieldLogKey(estacaConsultada.id, f.numero));
               const solucoes = log?.solucoesCampo ?? f.solucoesOriginais;
               return (
-                <div key={f.numero} className="flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-neutral-500">Faixa {f.numero}</span>
-                  <div className="flex flex-wrap gap-1">
-                    {solucoes.length === 0 ? <span className="text-xs text-neutral-400">Sem solução</span> : solucoes.map((s, i) => <SolutionBadge key={i} solucao={s} />)}
+                <div key={f.numero} className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-[10px] font-bold text-neutral-500">F{f.numero}</span>
+                  <div className="flex min-w-0 flex-col items-start gap-1">
+                    {solucoes.length === 0 ? (
+                      <span className="text-xs text-neutral-400">—</span>
+                    ) : (
+                      solucoes.map((s, i) => (
+                        <span key={i} className="max-w-full">
+                          <SolutionBadge solucao={s} />
+                        </span>
+                      ))
+                    )}
                   </div>
                 </div>
               );
             })}
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-neutral-500">Dreno</span>
-              <span className="inline-flex h-7 items-center gap-1 rounded-full border px-2 text-sm font-bold text-neutral-800" style={{ borderColor: CORES_DRENO[estacaConsultada.dreno] }}>
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CORES_DRENO[estacaConsultada.dreno] }} />
-                {DRENO_LABEL[estacaConsultada.dreno]}
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className="truncate text-[10px] font-bold text-neutral-500">Dreno</span>
+              <span
+                className="inline-flex h-7 max-w-full items-center gap-1 truncate rounded-full border px-2 text-sm font-bold text-neutral-800"
+                style={{ borderColor: CORES_DRENO[estacaConsultada.dreno] }}
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: CORES_DRENO[estacaConsultada.dreno] }} />
+                <span className="truncate">{DRENO_LABEL[estacaConsultada.dreno]}</span>
               </span>
             </div>
           </div>
@@ -185,6 +242,7 @@ export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Prop
                   numero={faixa.numero}
                   solucoesAtuais={log?.solucoesCampo ?? faixa.solucoesOriginais}
                   parametros={faixa.parametros}
+                  limiaresTolerancia={limiaresTolerancia}
                   nota={log?.notaCampo}
                   onAlterar={() => setFaixaEmEdicao(faixa.numero)}
                 />
@@ -200,14 +258,16 @@ export function VistoriaScreen({ projectId, config, onVoltar, onExportar }: Prop
 
       {modo === 'parametros' && <ParametrosTable estaca={estacaAtiva} />}
 
-      {faixaEditando && (
+      {modo === 'alteracoes' && <AlteracoesTab estacas={estacas} historico={historico} onReverter={reverter} />}
+
+      {faixaEmEdicao != null && (
         <AlteracaoBottomSheet
-          original={faixaEditando.solucoesOriginais}
-          atual={logEditando?.solucoesCampo ?? faixaEditando.solucoesOriginais}
-          notaAtual={logEditando?.notaCampo}
+          estaca={estacaAtiva}
+          fieldLogs={fieldLogs}
+          faixaInicial={faixaEmEdicao}
           config={config}
           onFechar={() => setFaixaEmEdicao(null)}
-          onConfirmar={(novas, nota) => confirmarAlteracao(faixaEditando.numero, novas, nota)}
+          onConfirmarFaixa={confirmarAlteracao}
         />
       )}
     </div>

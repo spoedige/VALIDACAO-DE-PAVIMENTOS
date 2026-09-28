@@ -2,11 +2,13 @@ import { useState } from 'react';
 import type { NormalizedSolution, ParametrosFaixa } from '../types/domain';
 import { SolutionBadge } from './SolutionBadge';
 import { ParametrosGrid } from './ParametrosGrid';
+import { calcularForaDeTolerancia, type LimiaresToleranciaConfig } from '../services/tolerancia';
 
 interface Props {
   numero: number;
   solucoesAtuais: NormalizedSolution[];
   parametros: ParametrosFaixa;
+  limiaresTolerancia: LimiaresToleranciaConfig | null;
   nota?: string;
   onAlterar: () => void;
 }
@@ -16,8 +18,9 @@ interface Props {
  * chips de solução sempre numa linha abaixo (quebrando quando não couberem),
  * nunca dividindo espaço com o botão nem sendo cortados por ele.
  */
-export function FaixaCard({ numero, solucoesAtuais, parametros, nota, onAlterar }: Props) {
+export function FaixaCard({ numero, solucoesAtuais, parametros, limiaresTolerancia, nota, onAlterar }: Props) {
   const [notaAberta, setNotaAberta] = useState(false);
+  const foraDeTolerancia = limiaresTolerancia ? calcularForaDeTolerancia(parametros, limiaresTolerancia) : undefined;
 
   return (
     <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-neutral-300 bg-white p-2">
@@ -55,7 +58,7 @@ export function FaixaCard({ numero, solucoesAtuais, parametros, nota, onAlterar 
       {notaAberta && nota && <p className="rounded bg-amber-50 p-2 text-xs text-neutral-800">{nota}</p>}
 
       <div className="border-t border-neutral-100 pt-1.5">
-        <ParametrosGrid parametros={parametros} />
+        <ParametrosGrid parametros={parametros} foraDeTolerancia={foraDeTolerancia} />
       </div>
     </div>
   );

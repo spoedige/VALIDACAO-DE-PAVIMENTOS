@@ -93,6 +93,10 @@ export interface FieldChangeHistoryEntry {
   de: NormalizedSolution[];
   para: NormalizedSolution[];
   nota?: string;
+  // marcado quando o operador reverte esse evento específico (aba
+  // "Alterações") — o registro nunca é apagado, só marcado. `undefined`
+  // quando o evento continua valendo.
+  revertidoEm?: string;
 }
 
 export type ValidationSeverity = 'bloqueante' | 'aviso';

@@ -4,7 +4,7 @@ import type { SessaoGpsInfo } from '../hooks/useGps';
 import type { GpsStatus } from '../services/gpsEngine';
 import { fieldLogKey } from '../db/projectService';
 import { corSolucao } from '../config/paleta';
-import { RotaPolyline } from '../components/RotaPolyline';
+import { MapaReal } from '../components/MapaReal';
 
 interface Props {
   projeto: Projeto;
@@ -116,8 +116,8 @@ export function DashboardScreen({ projeto, estacas, fieldLogs, status, sessaoInf
         </div>
       </Bloco>
 
-      <Bloco titulo="Mini-mapa (opcional)">
-        <RotaPolyline estacas={estacas} estacaAtualIndex={estacaAtivaIndex} />
+      <Bloco titulo="Mapa do trecho">
+        <MapaReal estacas={estacas} estacaAtualIndex={estacaAtivaIndex} />
       </Bloco>
     </div>
   );

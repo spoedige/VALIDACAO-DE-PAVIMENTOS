@@ -22,12 +22,14 @@ export function SolutionBadge({ solucao }: { solucao: NormalizedSolution }) {
   return (
     <span
       title={titulo}
-      className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-full border bg-white px-2 text-sm font-bold text-neutral-800"
+      className="inline-flex h-7 max-w-full items-center gap-1 overflow-hidden rounded-full border bg-white px-2 text-sm font-bold text-neutral-800"
       style={{ borderColor: cor }}
     >
       <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cor }} />
-      {unresolved ? 'UNKNOWN' : labelCurto}
-      {complementar && <span className="font-normal text-neutral-500">· {complementar}</span>}
+      {/* item 6: dentro de uma coluna de largura fixa (painel de consulta), o
+          nome precisa truncar, nunca empurrar a coluna vizinha */}
+      <span className="truncate">{unresolved ? 'UNKNOWN' : labelCurto}</span>
+      {complementar && <span className="shrink-0 font-normal text-neutral-500">· {complementar}</span>}
     </span>
   );
 }

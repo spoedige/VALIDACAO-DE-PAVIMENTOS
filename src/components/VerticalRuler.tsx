@@ -197,6 +197,15 @@ export function VerticalRuler({ estacas, estacaAtivaIndex, estacaConsultadaIndex
             </div>
           ))}
 
+          {/* linha separatória fina entre colunas de faixa adjacentes (item 9) —
+              só divisor visual, não interfere nos blocos internos (só cor) */}
+          {faixasNumeros.slice(0, -1).map((_, faixaIdx) => (
+            <div key={`divisor-${faixaIdx}`} className="absolute inset-y-0 w-px bg-neutral-300" style={{ left: (faixaIdx + 1) * larguraFaixa }} />
+          ))}
+          {faixasNumeros.length > 0 && (
+            <div className="absolute inset-y-0 w-px bg-neutral-300" style={{ left: faixasNumeros.length * larguraFaixa }} />
+          )}
+
           {/* coluna de dreno — mais fina que uma coluna de faixa */}
           {segmentosDreno.map((seg, i) => {
             const top = topPx(seg.hodometroFim);

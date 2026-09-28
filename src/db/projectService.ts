@@ -1,6 +1,7 @@
-import type { Estaca, FieldLog, ImportResult, NormalizedSolution, Projeto } from '../types/domain';
+import type { Estaca, FieldChangeHistoryEntry, FieldLog, ImportResult, NormalizedSolution, Projeto } from '../types/domain';
 import { db, type StationRow } from './schema';
 import { solutionSetsEqual } from './solutionSet';
+import { calcularEstadoAtualDaCadeia } from './historico';
 
 export interface ProjetoComAtividade extends Projeto {
   ultimaAtividade: string; // ISO — max(fieldLogs.lastModifiedAt) ou metadata.dataImport
@@ -108,6 +109,56 @@ export async function applyFieldChange(input: ApplyFieldChangeInput): Promise<Ap
     }
     await db.fieldChangeHistory.add({ projectId, timestamp: agora, estacaId, faixa, de, para: novasSolucoes, nota });
     return 'salvo';
+  });
+}
+
+export async function getFieldChangeHistoryByProject(projectId: string): Promise<FieldChangeHistoryEntry[]> {
+  const eventos = await db.fieldChangeHistory.where('projectId').equals(projectId).toArray();
+  return eventos.sort((a, b) => b.timestamp.localeCompare(a.timestamp)); // mais recente primeiro
+}
+
+/**
+ * Reverte um evento específico do histórico (aba "Alterações", item 5). O
+ * evento nunca é apagado — só marcado `revertidoEm` — e o estado atual da
+ * faixa é recalculado a partir da cadeia inteira de eventos ainda válidos,
+ * preservando alterações posteriores (ver `calcularEstadoAtualDaCadeia`).
+ * Diferente da regra de não ter estaca ativa manual: aqui não se mexe em
+ * GPS nem em qual estaca é a ativa, só em registros de solução já salvos.
+ */
+export async function reverterEvento(eventoId: number): Promise<void> {
+  await db.transaction('rw', db.fieldChangeHistory, db.fieldLogs, db.stations, async () => {
+    const evento = await db.fieldChangeHistory.get(eventoId);
+    if (!evento || evento.revertidoEm) return;
+
+    await db.fieldChangeHistory.update(eventoId, { revertidoEm: new Date().toISOString() });
+
+    const { projectId, estacaId, faixa } = evento;
+    const eventosDaFaixa = await db.fieldChangeHistory
+      .where('projectId').equals(projectId)
+      .filter((e) => e.estacaId === estacaId && e.faixa === faixa)
+      .toArray();
+
+    const estacao = await db.stations.where('[projectId+id]').equals([projectId, estacaId]).first();
+    const faixaOriginal = estacao?.faixas.find((f) => f.numero === faixa);
+    const solucaoOriginal = faixaOriginal?.solucoesOriginais ?? [];
+
+    const novoEstado = calcularEstadoAtualDaCadeia(eventosDaFaixa, solucaoOriginal);
+    const fieldLog = await db.fieldLogs.where('[projectId+estacaId+faixa]').equals([projectId, estacaId, faixa]).first();
+
+    // mesma regra de "sem alteração real, sem registro": se o estado
+    // recalculado bate com o original e não tem nota, não deixa um
+    // fieldLog órfão indistinguível do original.
+    if (solutionSetsEqual(novoEstado, solucaoOriginal) && !fieldLog?.notaCampo) {
+      if (fieldLog) await db.fieldLogs.delete(fieldLog.id!);
+      return;
+    }
+
+    const agora = new Date().toISOString();
+    if (fieldLog) {
+      await db.fieldLogs.update(fieldLog.id!, { solucoesCampo: novoEstado, lastModifiedAt: agora });
+    } else {
+      await db.fieldLogs.add({ projectId, estacaId, faixa, solucoesCampo: novoEstado, firstModifiedAt: agora, lastModifiedAt: agora });
+    }
   });
 }
 

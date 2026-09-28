@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ImportResult } from './types/domain';
 import { useNormalizationConfig } from './hooks/useNormalizationConfig';
+import { useLimiaresTolerancia } from './hooks/useLimiaresTolerancia';
 import { ListaProjetosScreen } from './screens/ListaProjetosScreen';
 import { ImportScreen } from './screens/ImportScreen';
 import { ValidationScreen } from './screens/ValidationScreen';
@@ -17,6 +18,7 @@ type View =
 
 function App() {
   const { config, erro } = useNormalizationConfig();
+  const { config: limiaresTolerancia } = useLimiaresTolerancia();
   const [view, setView] = useState<View>({ tipo: 'lista' });
   const [armazenamentoPersistente, setArmazenamentoPersistente] = useState<boolean | null>(null);
 
@@ -61,6 +63,7 @@ function App() {
         <VistoriaScreen
           projectId={view.projectId}
           config={config}
+          limiaresTolerancia={limiaresTolerancia}
           onVoltar={() => setView({ tipo: 'lista' })}
           onExportar={(projectId) => setView({ tipo: 'exportar', projectId })}
         />

@@ -1,0 +1,14 @@
+{
+  "_comentario": "Limiares de 'fora de tolerância' EXTRAÍDOS das regras de formatação condicional reais dos dois arquivos .xlsx fornecidos (MG_Crescente.xlsx e MG_Decrescente.xlsx, aba Unifilar, colunas V-AD do bloco da Faixa 1 — as mesmas regras se repetem idênticas nas faixas 2-6). Não são valores inventados: cada limiar abaixo corresponde exatamente à condição da regra de formatação condicional cujo preenchimento é rosa (#FFC7CE), a mesma cor de alerta que a planilha já usa. Verificado idêntico nos dois arquivos reais disponíveis nesta sessão — se um projeto futuro usar limiares diferentes, isso precisaria ser extraído por projeto (não implementado: assume-se um único padrão de engenharia entre concessões até haver evidência em contrário).",
+  "parametros": {
+    "iri": { "tipo": "numerico", "operador": ">=", "valor": 2.7 },
+    "percDefeitos": { "tipo": "numerico", "operador": ">=", "valor": 0.25 },
+    "atrMax": { "tipo": "numerico", "operador": ">=", "valor": 7 },
+    "oprd": { "tipo": "naoVazio" },
+    "exafe": { "tipo": "naoVazio" },
+    "hr": { "tipo": "numerico", "operador": ">=", "valor": 8 },
+    "d0": { "tipo": "numerico", "operador": ">=", "valor": 50 },
+    "rc": { "tipo": "numerico", "operador": "<", "valor": 70 },
+    "d120": { "tipo": "numerico", "operador": ">=", "valor": 10 }
+  }
+}

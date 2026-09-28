@@ -5,10 +5,12 @@ import {
   applyFieldChange,
   createProjectFromImport,
   deleteProject,
+  getFieldChangeHistoryByProject,
   getFieldLogsByProject,
   getStations,
   listProjects,
   renameProject,
+  reverterEvento,
 } from '../projectService';
 
 function sol(categoriaPai: NormalizedSolution['categoriaPai'], subtipoCodigo: string, valorComplementar?: number): NormalizedSolution {
@@ -138,5 +140,65 @@ describe('projectService', () => {
     expect(await getStations(projectId)).toHaveLength(0);
     expect(await getFieldLogsByProject(projectId)).toHaveLength(0);
     expect(await db.fieldChangeHistory.where('projectId').equals(projectId).toArray()).toHaveLength(0);
+  });
+});
+
+describe('reverterEvento (aba Alterações, item 5)', () => {
+  it('reverte um evento sem apagá-lo — só marca revertidoEm, mantém o registro', async () => {
+    const original = [sol('Estrutural', 'RPX', 7)];
+    const projectId = await createProjectFromImport(buildImportResult([estaca(0, original)]));
+    await applyFieldChange({ projectId, estacaId: 0, faixa: 1, original, novasSolucoes: [sol('Selagem', 'ST')] });
+    const [evento] = await getFieldChangeHistoryByProject(projectId);
+
+    await reverterEvento(evento.id!);
+
+    const historico = await getFieldChangeHistoryByProject(projectId);
+    expect(historico).toHaveLength(1); // continua existindo, não foi apagado
+    expect(historico[0].revertidoEm).toBeTruthy();
+  });
+
+  it('reverter o único evento de uma faixa remove o fieldLog (estado volta a ser o original)', async () => {
+    const original = [sol('Estrutural', 'RPX', 7)];
+    const projectId = await createProjectFromImport(buildImportResult([estaca(0, original)]));
+    await applyFieldChange({ projectId, estacaId: 0, faixa: 1, original, novasSolucoes: [sol('Selagem', 'ST')] });
+    const [evento] = await getFieldChangeHistoryByProject(projectId);
+
+    await reverterEvento(evento.id!);
+
+    expect(await getFieldLogsByProject(projectId)).toHaveLength(0);
+  });
+
+  it('cadeia original→A→B→C: reverter o evento intermediário (B) resulta em C, não em A', async () => {
+    const original: NormalizedSolution[] = [];
+    const A = [sol('Estrutural', 'RPX', 7)];
+    const B = [sol('Selagem', 'ST')];
+    const C = [sol('Microfres', 'MFS')];
+    const projectId = await createProjectFromImport(buildImportResult([estaca(0, original)]));
+
+    await applyFieldChange({ projectId, estacaId: 0, faixa: 1, original, novasSolucoes: A });
+    await applyFieldChange({ projectId, estacaId: 0, faixa: 1, original: A, novasSolucoes: B });
+    await applyFieldChange({ projectId, estacaId: 0, faixa: 1, original: B, novasSolucoes: C });
+
+    const historico = await getFieldChangeHistoryByProject(projectId); // mais recente primeiro
+    const eventoB = historico.find((h) => h.para[0]?.subtipoCodigo === 'ST')!;
+    await reverterEvento(eventoB.id!);
+
+    const logs = await getFieldLogsByProject(projectId);
+    expect(logs[0].solucoesCampo).toEqual(C);
+  });
+
+  it('reverter não mexe na estaca ativa nem no motor de GPS — é só dado de solução', async () => {
+    const original = [sol('Estrutural', 'RPX', 7)];
+    const projectId = await createProjectFromImport(buildImportResult([estaca(0, original), estaca(1, original)]));
+    await applyFieldChange({ projectId, estacaId: 0, faixa: 1, original, novasSolucoes: [sol('Selagem', 'ST')] });
+    const [evento] = await getFieldChangeHistoryByProject(projectId);
+
+    await reverterEvento(evento.id!);
+
+    // as estacas persistidas (posição, hodômetro, coordenadas) continuam intactas
+    const estacas = await getStations(projectId);
+    expect(estacas).toHaveLength(2);
+    expect(estacas[0].hodometroContinuo).toBe(0);
+    expect(estacas[1].hodometroContinuo).toBe(0.02);
   });
 });
