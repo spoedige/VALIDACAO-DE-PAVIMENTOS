@@ -85,6 +85,29 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
   const [modo, setModo] = useState<'vistoria' | 'dashboard' | 'parametros' | 'alteracoes'>('vistoria');
   const [estacaConsultadaIndex, setEstacaConsultadaIndex] = useState<number | null>(null);
   const [historico, setHistorico] = useState<FieldChangeHistoryEntry[]>([]);
+  // régua ocupando a altura real da coluna ao lado (GPS + consulta + cards),
+  // não só a altura dos cards — pedido explícito: subir a régua até o topo
+  // da tela, alinhando os dois lados e aproveitando mais espaço vertical de
+  // verdade (não só decorativo: a régua mostra a mesma janela de 2km numa
+  // área maior, ficando mais legível).
+  // ref-callback, não `useRef` comum: a div só existe depois que os dados
+  // terminam de carregar (e só quando `modo === 'vistoria'`), então um
+  // `useEffect` com dependência em `modo` não dispararia de novo quando o
+  // elemento aparecesse pela primeira vez (o valor de `modo` não muda entre
+  // o "Carregando…" e o conteúdo real). O ref-callback roda exatamente
+  // quando o elemento monta/desmonta, então o observer sempre acompanha o
+  // elemento certo.
+  const [colunaDireitaEl, setColunaDireitaEl] = useState<HTMLDivElement | null>(null);
+  const [alturaColunaDireita, setAlturaColunaDireita] = useState<number | null>(null);
+
+  useEffect(() => {
+    // ResizeObserver não existe em todo ambiente (ex: jsdom nos testes) —
+    // sem ele, a régua só cai no valor padrão de altura, nunca quebra.
+    if (!colunaDireitaEl || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => setAlturaColunaDireita(entry.contentRect.height));
+    observer.observe(colunaDireitaEl);
+    return () => observer.disconnect();
+  }, [colunaDireitaEl]);
 
   useEffect(() => {
     getProject(projectId).then((p) => setProjeto(p ?? null));
@@ -179,109 +202,128 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
         ))}
       </nav>
 
-      <div className="rounded-lg border border-neutral-300 bg-white p-3">
-        <div className="flex items-center justify-between">
-          <span className="text-[26px] font-extrabold tabular-nums leading-none text-neutral-900 sm:text-[32px]">{estacaAtiva.numeroEstaca}</span>
-          <StatusGps permissao={gps.permissao} status={gps.status} />
-        </div>
-        {gps.status?.confianca === 'baixa' && gps.status.diagnostico && (
-          <p className="mt-1 text-xs text-neutral-500">GPS: associação incerta · {gps.status.diagnostico}</p>
-        )}
-        {gps.permissao === 'negada' && <p className="mt-1 text-xs font-medium text-red-700">{MENSAGEM_PERMISSAO_NEGADA}</p>}
-        {gps.permissao === 'timeout' && !gps.status && (
-          <p className="mt-1 text-xs text-neutral-500">
-            Sem sinal de GPS até agora. Confira se a localização "precisa"/"alta precisão" está ativada no aparelho e se o navegador não está bloqueando a
-            localização (em navegadores como o Brave, isso costuma ficar em Configurações do site → Localização).
-          </p>
-        )}
-        {gps.sessaoInfo.latitude !== null && gps.sessaoInfo.longitude !== null && (
-          <p className="mt-1 text-[10px] text-neutral-500">
-            {municipioAtual.municipio
-              ? `${municipioAtual.municipio.nome}${municipioAtual.municipio.uf ? ` - ${municipioAtual.municipio.uf}` : ''}${municipioAtual.desatualizado ? ' (último registrado, sem sinal agora)' : ''}`
-              : municipioAtual.carregando
-                ? 'Localizando município…'
-                : 'Município indisponível offline'}
-            {' · '}
-            {gps.sessaoInfo.latitude.toFixed(5)}, {gps.sessaoInfo.longitude.toFixed(5)}
-          </p>
-        )}
-      </div>
-
-      {emConsulta && estacaConsultada && (
-        <div className="rounded-lg border border-blue-400 bg-blue-50 p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-bold text-blue-900">Consultando estaca {estacaConsultada.numeroEstaca}</span>
-            <button onClick={() => setEstacaConsultadaIndex(null)} className="h-8 rounded-lg bg-blue-600 px-3 text-xs font-bold text-white">
-              Voltar ao GPS
-            </button>
+      {(() => {
+        const painelGps = (
+          <div className="rounded-lg border border-neutral-300 bg-white p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[26px] font-extrabold tabular-nums leading-none text-neutral-900 sm:text-[32px]">{estacaAtiva.numeroEstaca}</span>
+              <StatusGps permissao={gps.permissao} status={gps.status} />
+            </div>
+            {gps.status?.confianca === 'baixa' && gps.status.diagnostico && (
+              <p className="mt-1 text-xs text-neutral-500">GPS: associação incerta · {gps.status.diagnostico}</p>
+            )}
+            {gps.permissao === 'negada' && <p className="mt-1 text-xs font-medium text-red-700">{MENSAGEM_PERMISSAO_NEGADA}</p>}
+            {gps.permissao === 'timeout' && !gps.status && (
+              <p className="mt-1 text-xs text-neutral-500">
+                Sem sinal de GPS até agora. Confira se a localização "precisa"/"alta precisão" está ativada no aparelho e se o navegador não está bloqueando a
+                localização (em navegadores como o Brave, isso costuma ficar em Configurações do site → Localização).
+              </p>
+            )}
+            {gps.sessaoInfo.latitude !== null && gps.sessaoInfo.longitude !== null && (
+              <p className="mt-1 text-[10px] text-neutral-500">
+                {municipioAtual.municipio
+                  ? `${municipioAtual.municipio.nome}${municipioAtual.municipio.uf ? ` - ${municipioAtual.municipio.uf}` : ''}${municipioAtual.desatualizado ? ' (último registrado, sem sinal agora)' : ''}`
+                  : municipioAtual.carregando
+                    ? 'Localizando município…'
+                    : 'Município indisponível offline'}
+                {' · '}
+                {gps.sessaoInfo.latitude.toFixed(5)}, {gps.sessaoInfo.longitude.toFixed(5)}
+              </p>
+            )}
           </div>
-          <div className={`divide-x divide-neutral-300 ${gridConsultaClassName(estacaConsultada.faixas.length)}`}>
-            {estacaConsultada.faixas.map((f) => {
-              const log = fieldLogs.get(fieldLogKey(estacaConsultada.id, f.numero));
-              const solucoes = log?.solucoesCampo ?? f.solucoesOriginais;
-              return (
-                <div key={f.numero} className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate text-[10px] font-bold text-neutral-500">F{f.numero}</span>
-                  <div className="flex min-w-0 flex-col items-start gap-1">
-                    {solucoes.length === 0 ? (
-                      <span className="text-xs text-neutral-400">—</span>
-                    ) : (
-                      solucoes.map((s, i) => (
-                        <span key={i} className="max-w-full">
-                          <SolutionBadge solucao={s} compacto />
-                        </span>
-                      ))
-                    )}
+        );
+
+        const painelConsulta = emConsulta && estacaConsultada && (
+          <div className="rounded-lg border border-blue-400 bg-blue-50 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-bold text-blue-900">Consultando estaca {estacaConsultada.numeroEstaca}</span>
+              <button onClick={() => setEstacaConsultadaIndex(null)} className="h-8 rounded-lg bg-blue-600 px-3 text-xs font-bold text-white">
+                Voltar ao GPS
+              </button>
+            </div>
+            <div className={`divide-x divide-neutral-300 ${gridConsultaClassName(estacaConsultada.faixas.length)}`}>
+              {estacaConsultada.faixas.map((f) => {
+                const log = fieldLogs.get(fieldLogKey(estacaConsultada.id, f.numero));
+                const solucoes = log?.solucoesCampo ?? f.solucoesOriginais;
+                return (
+                  <div key={f.numero} className="flex min-w-0 flex-col gap-1">
+                    <span className="truncate text-[10px] font-bold text-neutral-500">F{f.numero}</span>
+                    <div className="flex min-w-0 flex-col items-start gap-1">
+                      {solucoes.length === 0 ? (
+                        <span className="text-xs text-neutral-400">—</span>
+                      ) : (
+                        solucoes.map((s, i) => (
+                          <span key={i} className="max-w-full">
+                            <SolutionBadge solucao={s} compacto />
+                          </span>
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="truncate text-[10px] font-bold text-neutral-500">Dreno</span>
-              <span
-                className="inline-flex h-5 max-w-full items-center gap-1 truncate rounded-full border px-1.5 text-[10px] font-bold text-neutral-800"
-                style={{ borderColor: CORES_DRENO[estacaConsultada.dreno] }}
-              >
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: CORES_DRENO[estacaConsultada.dreno] }} />
-                <span className="truncate">{DRENO_LABEL[estacaConsultada.dreno]}</span>
-              </span>
+                );
+              })}
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="truncate text-[10px] font-bold text-neutral-500">Dreno</span>
+                <span
+                  className="inline-flex h-5 max-w-full items-center gap-1 truncate rounded-full border px-1.5 text-[10px] font-bold text-neutral-800"
+                  style={{ borderColor: CORES_DRENO[estacaConsultada.dreno] }}
+                >
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: CORES_DRENO[estacaConsultada.dreno] }} />
+                  <span className="truncate">{DRENO_LABEL[estacaConsultada.dreno]}</span>
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
 
-      {modo === 'vistoria' && (
-        // Régua à esquerda, cards (onde fica o botão "Alterar") à direita:
-        // a maioria dos operadores é destra e senta no banco do passageiro,
-        // então a mão direita — a mais funcional pra editar durante o
-        // trajeto — fica mais perto dos cards, não da régua de consulta.
-        <div className="flex gap-2">
-          <VerticalRuler
-            estacas={estacas}
-            estacaAtivaIndex={gps.estacaAtivaIndex}
-            estacaConsultadaIndex={estacaConsultadaIndex}
-            fieldLogs={fieldLogs}
-            onConsultarHodometro={setEstacaConsultadaIndex}
-          />
-          <div className={`min-w-0 flex-1 ${gridFaixasClassName(estacaExibida.faixas.length)}`}>
-            {estacaExibida.faixas.map((faixa) => {
-              const key = fieldLogKey(estacaExibida.id, faixa.numero);
-              const log = fieldLogs.get(key);
-              return (
-                <FaixaCard
-                  key={faixa.numero}
-                  numero={faixa.numero}
-                  solucoesAtuais={log?.solucoesCampo ?? faixa.solucoesOriginais}
-                  parametros={faixa.parametros}
-                  limiaresTolerancia={limiaresTolerancia}
-                  nota={log?.notaCampo}
-                  onAlterar={() => setFaixaEmEdicao({ estacaId: estacaExibida.id, faixaNumero: faixa.numero })}
-                />
-              );
-            })}
+        if (modo !== 'vistoria') {
+          return (
+            <>
+              {painelGps}
+              {painelConsulta}
+            </>
+          );
+        }
+
+        // Régua à esquerda, ocupando a altura inteira da coluna da direita
+        // (GPS + consulta + cards) — antes só ia até a altura dos cards,
+        // deixando os dois lados desalinhados e desperdiçando espaço
+        // vertical. Mão direita nos cards (onde fica "Alterar") porque a
+        // maioria dos operadores é destra e senta no banco do passageiro.
+        return (
+          <div className="flex items-start gap-2">
+            <VerticalRuler
+              estacas={estacas}
+              estacaAtivaIndex={gps.estacaAtivaIndex}
+              estacaConsultadaIndex={estacaConsultadaIndex}
+              fieldLogs={fieldLogs}
+              onConsultarHodometro={setEstacaConsultadaIndex}
+              alturaDisponivelPx={alturaColunaDireita}
+            />
+            <div ref={setColunaDireitaEl} className="flex min-w-0 flex-1 flex-col gap-3">
+              {painelGps}
+              {painelConsulta}
+              <div className={gridFaixasClassName(estacaExibida.faixas.length)}>
+                {estacaExibida.faixas.map((faixa) => {
+                  const key = fieldLogKey(estacaExibida.id, faixa.numero);
+                  const log = fieldLogs.get(key);
+                  return (
+                    <FaixaCard
+                      key={faixa.numero}
+                      numero={faixa.numero}
+                      solucoesAtuais={log?.solucoesCampo ?? faixa.solucoesOriginais}
+                      parametros={faixa.parametros}
+                      limiaresTolerancia={limiaresTolerancia}
+                      nota={log?.notaCampo}
+                      onAlterar={() => setFaixaEmEdicao({ estacaId: estacaExibida.id, faixaNumero: faixa.numero })}
+                    />
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {modo === 'dashboard' && (
         <DashboardScreen projeto={projeto} estacas={estacas} fieldLogs={fieldLogs} status={gps.status} sessaoInfo={gps.sessaoInfo} estacaAtivaIndex={gps.estacaAtivaIndex} />

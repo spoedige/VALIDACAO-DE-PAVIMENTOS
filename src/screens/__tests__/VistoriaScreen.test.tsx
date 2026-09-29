@@ -304,3 +304,51 @@ describe('VistoriaScreen — clique na régua atualiza os cards de Faixa (regres
     expect(screen.queryByText(/Estaca 0\+050/)).not.toBeInTheDocument();
   });
 });
+
+// Rodada "subir o unifilar": a régua passou a ocupar a altura real da coluna
+// ao lado (GPS + consulta + cards), medida via ResizeObserver. Bug real
+// encontrado nessa mudança: o `useEffect` que criava o observer dependia de
+// `[modo]`, mas a div observada só existe depois que os dados terminam de
+// carregar — como `modo` não muda entre o "Carregando…" e o conteúdo real,
+// o observer nunca era recriado pra pegar o elemento certo, e ficava preso
+// olhando pra um ref nulo (ou pra nada). Corrigido trocando por um
+// ref-callback, que dispara exatamente quando o elemento monta.
+describe('VistoriaScreen — régua observa a altura real da coluna (mesmo após o "Carregando…" inicial)', () => {
+  it('ResizeObserver.observe é chamado com o elemento real da coluna, não fica preso num ref nulo do primeiro render', async () => {
+    const observeSpy = vi.fn();
+    class FakeResizeObserver {
+      callback: ResizeObserverCallback;
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback;
+      }
+      observe(target: Element) {
+        observeSpy(target);
+        this.callback([{ contentRect: { height: 690 } } as ResizeObserverEntry], this as unknown as ResizeObserver);
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+
+    const projectId = await createProjectFromImport(buildImportResult([estaca(0)]));
+    render(
+      <VistoriaScreen
+        projectId={projectId}
+        config={CONFIG}
+        limiaresTolerancia={null}
+        onVoltar={() => {}}
+        onExportar={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('Alterar')).toBeInTheDocument());
+
+    // se o bug voltar (effect preso num ref nulo do render de "Carregando…"),
+    // observe nunca é chamado com o elemento de verdade.
+    await waitFor(() => expect(observeSpy).toHaveBeenCalled());
+    const elementoObservado = observeSpy.mock.calls[0][0] as HTMLElement;
+    expect(elementoObservado.textContent).toContain('Faixa 1');
+
+    vi.unstubAllGlobals();
+  });
+});

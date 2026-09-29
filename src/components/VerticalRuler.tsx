@@ -15,7 +15,7 @@ const RULER_WIDTH_PX = 88; // faixa de 64-96px pedida; não cresce com o nº de 
 const MIN_SEGMENT_PX = 5; // altura mínima garantida por segmento, nunca invisível
 const JANELA_KM_TOTAL = 2; // ~1-2km antes/depois, ponto de partida (seção 6)
 const JANELA_FRACAO_ATRAS = 1 / 3; // marca da posição atual a 1/3 de baixo pra cima
-const ALTURA_JANELA_PX = 420;
+const ALTURA_JANELA_PADRAO_PX = 420; // usado só antes da primeira medição real do pai
 
 interface SegmentoFaixa {
   hodometroInicio: number;
@@ -70,9 +70,15 @@ interface Props {
   estacaConsultadaIndex: number | null;
   fieldLogs: Map<string, FieldLog>;
   onConsultarHodometro: (estacaIndex: number) => void;
+  // altura real (px) da coluna irmã (GPS + consulta + cards), medida pelo
+  // pai via ResizeObserver — pedido explícito: subir a régua até o topo da
+  // tela, alinhada com o resto do layout, aproveitando o espaço vertical de
+  // verdade (a mesma janela de 2km fica maior/mais legível, não só decorativa).
+  // Antes da primeira medição (ou se o pai não passar), cai no valor padrão.
+  alturaDisponivelPx?: number | null;
 }
 
-export function VerticalRuler({ estacas, estacaAtivaIndex, estacaConsultadaIndex, fieldLogs, onConsultarHodometro }: Props) {
+export function VerticalRuler({ estacas, estacaAtivaIndex, estacaConsultadaIndex, fieldLogs, onConsultarHodometro, alturaDisponivelPx }: Props) {
   const [modoCompleto, setModoCompleto] = useState(false);
   const [legendaAberta, setLegendaAberta] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -107,7 +113,11 @@ export function VerticalRuler({ estacas, estacaAtivaIndex, estacaConsultadaIndex
   }, [modoCompleto, estacaAtiva, hodometroMin, hodometroMax, seguindoAtiva, inicioManual]);
 
   const totalKm = Math.max(janela.fim - janela.inicio, 0.001);
-  const alturaPx = modoCompleto ? Math.max(ALTURA_JANELA_PX, totalKm * 240) : ALTURA_JANELA_PX;
+  // nunca ENCOLHE abaixo do padrão antigo (poucas faixas deixariam a régua
+  // pequena/apertada demais) — só CRESCE quando a coluna ao lado é maior,
+  // que é o caso comum agora que ela inclui o card de GPS e o de consulta.
+  const alturaJanelaPadrao = Math.max(alturaDisponivelPx ?? 0, ALTURA_JANELA_PADRAO_PX);
+  const alturaPx = modoCompleto ? Math.max(alturaJanelaPadrao, totalKm * 240) : alturaJanelaPadrao;
   const pxPerKm = alturaPx / totalKm;
 
   // hodômetro -> posição vertical em px, dentro do container desta régua.
