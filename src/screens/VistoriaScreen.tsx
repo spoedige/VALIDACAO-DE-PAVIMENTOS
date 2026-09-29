@@ -171,7 +171,7 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
 
       <div className="rounded-lg border border-neutral-300 bg-white p-3">
         <div className="flex items-center justify-between">
-          <span className="text-[32px] font-extrabold tabular-nums leading-none text-neutral-900 sm:text-[40px]">{estacaAtiva.numeroEstaca}</span>
+          <span className="text-[26px] font-extrabold tabular-nums leading-none text-neutral-900 sm:text-[32px]">{estacaAtiva.numeroEstaca}</span>
           <StatusGps permissao={gps.permissao} status={gps.status} />
         </div>
         {gps.status?.confianca === 'baixa' && gps.status.diagnostico && (
@@ -188,7 +188,7 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
               Voltar ao GPS
             </button>
           </div>
-          <div className={gridConsultaClassName(estacaConsultada.faixas.length)}>
+          <div className={`divide-x divide-neutral-300 ${gridConsultaClassName(estacaConsultada.faixas.length)}`}>
             {estacaConsultada.faixas.map((f) => {
               const log = fieldLogs.get(fieldLogKey(estacaConsultada.id, f.numero));
               const solucoes = log?.solucoesCampo ?? f.solucoesOriginais;
@@ -201,7 +201,7 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
                     ) : (
                       solucoes.map((s, i) => (
                         <span key={i} className="max-w-full">
-                          <SolutionBadge solucao={s} />
+                          <SolutionBadge solucao={s} compacto />
                         </span>
                       ))
                     )}

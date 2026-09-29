@@ -60,7 +60,7 @@ function estadoInicialFaixa(estaca: Estaca, faixaNumero: number, fieldLogs: Map<
  *   uma solução simultânea por faixa.
  * - Abas de faixa no topo: dá pra mexer em mais de uma faixa da mesma estaca
  *   sem fechar a tela. Cada faixa mantém seu próprio estado ao trocar de aba.
- * - "Confirmar" salva a faixa atual sem fechar a tela; só "Concluir" fecha.
+ * - "Adicionar" salva a faixa atual sem fechar a tela; só "Concluir" fecha.
  */
 export function AlteracaoBottomSheet({ estaca, fieldLogs, faixaInicial, config, onFechar, onConfirmarFaixa }: Props) {
   const catalogo = catalogoSubtipos(config);
@@ -182,7 +182,7 @@ export function AlteracaoBottomSheet({ estaca, fieldLogs, faixaInicial, config, 
               Limpar Faixa
             </button>
             <button onClick={confirmar} disabled={salvando} className="h-11 flex-1 rounded-lg border border-neutral-400 text-sm font-bold text-neutral-800 disabled:opacity-50">
-              {salvando ? 'Salvando…' : 'Confirmar'}
+              {salvando ? 'Salvando…' : 'Adicionar'}
             </button>
             <button onClick={onFechar} className="h-11 flex-1 rounded-lg bg-neutral-900 text-sm font-bold text-white">
               Concluir

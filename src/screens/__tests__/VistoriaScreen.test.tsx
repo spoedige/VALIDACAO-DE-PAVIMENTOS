@@ -82,7 +82,7 @@ describe('VistoriaScreen — Alterações reflete alteração confirmada (regres
     const modalContainer = modal.closest('.fixed')!;
 
     await user.click(within(modalContainer as HTMLElement).getByText('Reconstrução'));
-    await user.click(within(modalContainer as HTMLElement).getByText('Confirmar'));
+    await user.click(within(modalContainer as HTMLElement).getByText('Adicionar'));
     await waitFor(() => expect(within(modalContainer as HTMLElement).getByText('Faixa 1 salva')).toBeInTheDocument());
     await user.click(within(modalContainer as HTMLElement).getByText('Concluir'));
 

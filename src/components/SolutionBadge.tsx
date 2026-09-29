@@ -13,7 +13,14 @@ function formatarComplementar(valor: number | undefined): string | null {
  * discretas que o botão "Alterar" (borda fina de 1-2px, não 4px; sem
  * preenchimento saturado), não só a fonte menor.
  */
-export function SolutionBadge({ solucao }: { solucao: NormalizedSolution }) {
+interface Props {
+  solucao: NormalizedSolution;
+  // painel de consulta da régua: texto pela metade do tamanho normal, o chip
+  // inteiro (não só a fonte) fica mais compacto pra caber nas colunas finas.
+  compacto?: boolean;
+}
+
+export function SolutionBadge({ solucao, compacto }: Props) {
   const { labelCurto, label, cor } = corSolucao(solucao.categoriaPai, solucao.subtipoCodigo);
   const unresolved = solucao.normalizationStatus === 'unresolved';
   const complementar = unresolved ? String(solucao.valorBruto) : formatarComplementar(solucao.valorComplementar);
@@ -22,10 +29,12 @@ export function SolutionBadge({ solucao }: { solucao: NormalizedSolution }) {
   return (
     <span
       title={titulo}
-      className="inline-flex h-7 max-w-full items-center gap-1 overflow-hidden rounded-full border bg-white px-2 text-sm font-bold text-neutral-800"
+      className={`inline-flex max-w-full items-center gap-1 overflow-hidden rounded-full border bg-white font-bold text-neutral-800 ${
+        compacto ? 'h-4 px-1 text-[7px]' : 'h-7 px-2 text-sm'
+      }`}
       style={{ borderColor: cor }}
     >
-      <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cor }} />
+      <span aria-hidden className={`shrink-0 rounded-full ${compacto ? 'h-1.5 w-1.5' : 'h-2 w-2'}`} style={{ backgroundColor: cor }} />
       {/* item 6: dentro de uma coluna de largura fixa (painel de consulta), o
           nome precisa truncar, nunca empurrar a coluna vizinha */}
       <span className="truncate">{unresolved ? 'UNKNOWN' : labelCurto}</span>
