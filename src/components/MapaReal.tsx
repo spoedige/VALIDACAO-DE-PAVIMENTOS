@@ -92,6 +92,12 @@ export function MapaReal({ estacas, estacaAtualIndex }: Props) {
     };
   }, []);
 
+  function centralizar() {
+    const atual = pontosValidos.find((p) => p.i === estacaAtualIndex) ?? pontosValidos[pontosValidos.length - 1];
+    if (!mapRef.current || !atual) return;
+    mapRef.current.flyTo([atual.lat, atual.lon], Math.max(mapRef.current.getZoom(), 14));
+  }
+
   if (usarFallback) {
     return (
       <div>
@@ -101,5 +107,21 @@ export function MapaReal({ estacas, estacaAtualIndex }: Props) {
     );
   }
 
-  return <div ref={containerRef} className="h-56 w-full overflow-hidden rounded-lg border border-neutral-300" />;
+  return (
+    <div className="relative">
+      <div ref={containerRef} className="h-56 w-full overflow-hidden rounded-lg border border-neutral-300" />
+      {/* botão de centralizar (item 4 da rodada 6): sem isso, o mapa fica
+          "solto" — dá pra arrastar/dar zoom e perder de vista a posição
+          atual, sem jeito de voltar sem recarregar a tela. z-index acima dos
+          controles do próprio Leaflet (zoom +/-, ~400-1000). */}
+      <button
+        onClick={centralizar}
+        aria-label="Centralizar mapa na posição atual"
+        title="Centralizar na posição atual"
+        className="absolute right-2 top-2 z-[1000] flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-300 bg-white text-base shadow-sm active:bg-neutral-100"
+      >
+        🎯
+      </button>
+    </div>
+  );
 }

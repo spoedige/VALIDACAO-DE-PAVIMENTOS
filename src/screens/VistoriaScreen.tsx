@@ -73,7 +73,14 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
   const [projeto, setProjeto] = useState<Projeto | null>(null);
   const [estacas, setEstacas] = useState<Estaca[] | null>(null);
   const [fieldLogs, setFieldLogs] = useState<Map<string, FieldLog>>(new Map());
-  const [faixaEmEdicao, setFaixaEmEdicao] = useState<number | null>(null);
+  // guarda a estaca por ID, "congelada" no momento em que "Alterar" foi
+  // tocado — nunca deriva de `estacaAtiva`/`gps.estacaAtivaIndex` de novo.
+  // Bug real reportado: como o veículo não para durante a vistoria, o GPS
+  // pode avançar a estaca ativa enquanto a folha de edição está aberta; se a
+  // folha ficasse lendo `estacaAtiva` ao vivo, a edição em andamento passava
+  // a valer, sem aviso, pra uma estaca diferente da que o operador via na
+  // tela quando tocou em "Alterar".
+  const [faixaEmEdicao, setFaixaEmEdicao] = useState<{ estacaId: number; faixaNumero: number } | null>(null);
   const [modo, setModo] = useState<'vistoria' | 'dashboard' | 'parametros' | 'alteracoes'>('vistoria');
   const [estacaConsultadaIndex, setEstacaConsultadaIndex] = useState<number | null>(null);
   const [historico, setHistorico] = useState<FieldChangeHistoryEntry[]>([]);
@@ -109,11 +116,12 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
     setHistorico(await getFieldChangeHistoryByProject(projectId));
   }
 
-  async function confirmarAlteracao(faixaNumero: number, novasSolucoes: NormalizedSolution[], nota?: string) {
-    const faixaOriginal = estacaAtiva.faixas.find((f) => f.numero === faixaNumero)!;
+  async function confirmarAlteracao(estacaId: number, faixaNumero: number, novasSolucoes: NormalizedSolution[], nota?: string) {
+    const estacaDaEdicao = estacas!.find((e) => e.id === estacaId)!;
+    const faixaOriginal = estacaDaEdicao.faixas.find((f) => f.numero === faixaNumero)!;
     await applyFieldChange({
       projectId,
-      estacaId: estacaAtiva.id,
+      estacaId,
       faixa: faixaNumero,
       original: faixaOriginal.solucoesOriginais,
       novasSolucoes,
@@ -178,6 +186,12 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
           <p className="mt-1 text-xs text-neutral-500">GPS: associação incerta · {gps.status.diagnostico}</p>
         )}
         {gps.permissao === 'negada' && <p className="mt-1 text-xs font-medium text-red-700">{MENSAGEM_PERMISSAO_NEGADA}</p>}
+        {gps.permissao === 'timeout' && !gps.status && (
+          <p className="mt-1 text-xs text-neutral-500">
+            Sem sinal de GPS até agora. Confira se a localização "precisa"/"alta precisão" está ativada no aparelho e se o navegador não está bloqueando a
+            localização (em navegadores como o Brave, isso costuma ficar em Configurações do site → Localização).
+          </p>
+        )}
       </div>
 
       {emConsulta && estacaConsultada && (
@@ -212,10 +226,10 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
             <div className="flex min-w-0 flex-col gap-1">
               <span className="truncate text-[10px] font-bold text-neutral-500">Dreno</span>
               <span
-                className="inline-flex h-7 max-w-full items-center gap-1 truncate rounded-full border px-2 text-sm font-bold text-neutral-800"
+                className="inline-flex h-4 max-w-full items-center gap-1 truncate rounded-full border px-1 text-[7px] font-bold text-neutral-800"
                 style={{ borderColor: CORES_DRENO[estacaConsultada.dreno] }}
               >
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: CORES_DRENO[estacaConsultada.dreno] }} />
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: CORES_DRENO[estacaConsultada.dreno] }} />
                 <span className="truncate">{DRENO_LABEL[estacaConsultada.dreno]}</span>
               </span>
             </div>
@@ -248,7 +262,7 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
                   parametros={faixa.parametros}
                   limiaresTolerancia={limiaresTolerancia}
                   nota={log?.notaCampo}
-                  onAlterar={emConsulta ? undefined : () => setFaixaEmEdicao(faixa.numero)}
+                  onAlterar={() => setFaixaEmEdicao({ estacaId: estacaExibida.id, faixaNumero: faixa.numero })}
                 />
               );
             })}
@@ -266,12 +280,12 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
 
       {faixaEmEdicao != null && (
         <AlteracaoBottomSheet
-          estaca={estacaAtiva}
+          estaca={estacas.find((e) => e.id === faixaEmEdicao.estacaId)!}
           fieldLogs={fieldLogs}
-          faixaInicial={faixaEmEdicao}
+          faixaInicial={faixaEmEdicao.faixaNumero}
           config={config}
           onFechar={() => setFaixaEmEdicao(null)}
-          onConfirmarFaixa={confirmarAlteracao}
+          onConfirmarFaixa={(faixaNumero, novasSolucoes, nota) => confirmarAlteracao(faixaEmEdicao.estacaId, faixaNumero, novasSolucoes, nota)}
         />
       )}
     </div>

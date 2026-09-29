@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Estaca, ImportResult } from '../../types/domain';
+import type { Estaca, ImportResult, NormalizedSolution } from '../../types/domain';
 import type { NormalizationConfig } from '../../services/normalizer';
 import { db } from '../../db/schema';
 import { createProjectFromImport } from '../../db/projectService';
@@ -180,7 +180,8 @@ describe('VistoriaScreen — clique na régua atualiza os cards de Faixa (regres
     expect(screen.queryByText('3,33')).not.toBeInTheDocument();
   });
 
-  it('enquanto consulta outra estaca, "Alterar" fica desabilitado — nunca edita a estaca errada', async () => {
+  it('editar via consulta na régua salva na estaca CONSULTADA, nunca na ativa', async () => {
+    const user = userEvent.setup();
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
       top: 0, left: 0, right: 88, bottom: 420, width: 88, height: 420, x: 0, y: 0, toJSON: () => {},
     });
@@ -199,12 +200,95 @@ describe('VistoriaScreen — clique na régua atualiza os cards de Faixa (regres
     );
 
     await waitFor(() => expect(screen.getByText('Alterar')).toBeInTheDocument());
-    expect(screen.getByText('Alterar')).toBeEnabled();
 
     const regua = screen.getByRole('button', { name: /Régua de consulta/i });
-    fireEvent.click(regua, { clientY: 10 }); // consulta a outra estaca
-
+    fireEvent.click(regua, { clientY: 10 }); // consulta a outra estaca (índice 1, não a ativa)
     await waitFor(() => expect(screen.getByText('9,99')).toBeInTheDocument());
-    expect(screen.getByText('Alterar')).toBeDisabled();
+
+    // "Alterar" continua habilitado durante a consulta — o item 3 da rodada
+    // 6 exige edição livre; o que impede editar a estaca errada não é
+    // desabilitar o botão, é fixar por ID qual estaca a folha está editando.
+    await user.click(screen.getByText('Alterar'));
+    const modal = await screen.findByText('Solução original do projeto');
+    const modalContainer = modal.closest('.fixed')!;
+    await user.click(within(modalContainer as HTMLElement).getByText('Reconstrução'));
+    await user.click(within(modalContainer as HTMLElement).getByText('Adicionar'));
+    await waitFor(() => expect(within(modalContainer as HTMLElement).getByText('Faixa 1 salva')).toBeInTheDocument());
+    await user.click(within(modalContainer as HTMLElement).getByText('Concluir'));
+
+    await user.click(screen.getByRole('button', { name: /Alterações/ }));
+    // o registro precisa citar a estaca consultada (0+1000), não a ativa (0+0)
+    expect(await screen.findByText(/Estaca 0\+1000/)).toBeInTheDocument();
+    expect(screen.queryByText(/Estaca 0\+0\b/)).not.toBeInTheDocument();
+  });
+
+  it('GPS avançar a estaca ativa enquanto a folha de edição está aberta não desvia a edição pra estaca nova (bug relatado na rodada 6)', async () => {
+    const user = userEvent.setup();
+
+    // estacas com lat/long reais e próximas o bastante pro motor de GPS
+    // confirmar a segunda como ativa em 2 leituras estáveis.
+    const original: NormalizedSolution[] = [];
+    const estacas: Estaca[] = [
+      { id: 0, numeroEstaca: '0+000', hodometroContinuo: 0, hodometroMarco: '0+000', latitude: -18.4, longitude: -48.0, tipoSecao: null, marcoKm: null, observacaoOriginal: null, dreno: 'ausente', faixas: [{ numero: 1, parametros: {}, solucoesOriginais: original }] },
+      { id: 1, numeroEstaca: '0+050', hodometroContinuo: 0.05, hodometroMarco: '0+050', latitude: -18.3996, longitude: -48.0, tipoSecao: null, marcoKm: null, observacaoOriginal: null, dreno: 'ausente', faixas: [{ numero: 1, parametros: {}, solucoesOriginais: original }] },
+    ];
+    const projectId = await createProjectFromImport(buildImportResult(estacas));
+
+    let sucessoGps: ((pos: GeolocationPosition) => void) | null = null;
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        watchPosition: (sucesso: (pos: GeolocationPosition) => void) => {
+          sucessoGps = sucesso;
+          return 1;
+        },
+        clearWatch: () => {},
+      },
+    });
+
+    render(
+      <VistoriaScreen
+        projectId={projectId}
+        config={CONFIG}
+        limiaresTolerancia={null}
+        onVoltar={() => {}}
+        onExportar={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('Alterar')).toBeInTheDocument());
+
+    // operador toca "Alterar" na estaca ativa (0+000) — a folha precisa ficar
+    // presa nessa estaca pelo resto da edição, custe o que custar.
+    await user.click(screen.getByText('Alterar'));
+    const modal = await screen.findByText('Solução original do projeto');
+    const modalContainer = modal.closest('.fixed')!;
+    expect(within(modalContainer as HTMLElement).getByText('Sem solução')).toBeInTheDocument();
+
+    // com a folha ainda aberta, o veículo continua andando: 2 leituras de
+    // GPS estáveis perto da PRÓXIMA estaca fazem o motor confirmar a
+    // mudança de estaca ativa por baixo, sem nenhuma ação do operador.
+    function leitura(lat: number, lon: number, timestamp: number): GeolocationPosition {
+      return { coords: { latitude: lat, longitude: lon, accuracy: 5, altitude: null, altitudeAccuracy: null, heading: null, speed: null }, timestamp } as GeolocationPosition;
+    }
+    sucessoGps!(leitura(-18.3996, -48.0, 1000));
+    sucessoGps!(leitura(-18.3996, -48.0, 1500));
+
+    await waitFor(() => expect(screen.getByText('0+050')).toBeInTheDocument()); // confirma que a estaca ativa avançou de verdade
+
+    // a folha continua aberta e ainda mostra a estaca original (0+000) —
+    // nunca trocou por baixo dos pés do operador.
+    expect(within(modalContainer as HTMLElement).getByText('Sem solução')).toBeInTheDocument();
+
+    await user.click(within(modalContainer as HTMLElement).getByText('Reconstrução'));
+    await user.click(within(modalContainer as HTMLElement).getByText('Adicionar'));
+    await waitFor(() => expect(within(modalContainer as HTMLElement).getByText('Faixa 1 salva')).toBeInTheDocument());
+    await user.click(within(modalContainer as HTMLElement).getByText('Concluir'));
+
+    await user.click(screen.getByRole('button', { name: /Alterações/ }));
+    // o registro precisa citar 0+000 (a estaca que estava sendo editada
+    // quando "Alterar" foi tocado), nunca 0+050 (onde o GPS terminou)
+    expect(await screen.findByText(/Estaca 0\+000/)).toBeInTheDocument();
+    expect(screen.queryByText(/Estaca 0\+050/)).not.toBeInTheDocument();
   });
 });
