@@ -10,7 +10,11 @@ interface Props {
   parametros: ParametrosFaixa;
   limiaresTolerancia: LimiaresToleranciaConfig | null;
   nota?: string;
-  onAlterar: () => void;
+  // undefined enquanto o card exibe uma estaca CONSULTADA (não a ativa) —
+  // "Alterar" só pode operar sobre a estaca ativa (seção 2 do documento
+  // original), nunca sobre a posição consultada na régua, então o botão
+  // fica desabilitado em vez de editar a estaca errada.
+  onAlterar?: () => void;
 }
 
 /**
@@ -42,7 +46,9 @@ export function FaixaCard({ numero, solucoesAtuais, parametros, limiaresToleranc
         </div>
         <button
           onClick={onAlterar}
-          className="h-11 shrink-0 rounded-lg border border-neutral-400 px-2 text-xs font-bold text-neutral-800 active:bg-neutral-100 sm:h-11 sm:px-3 sm:text-sm"
+          disabled={!onAlterar}
+          title={onAlterar ? undefined : 'Volte pra estaca ativa (GPS) pra alterar'}
+          className="h-11 shrink-0 rounded-lg border border-neutral-400 px-2 text-xs font-bold text-neutral-800 active:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:px-3 sm:text-sm"
         >
           Alterar
         </button>

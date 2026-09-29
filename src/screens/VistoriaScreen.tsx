@@ -129,6 +129,10 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
 
   const emConsulta = estacaConsultadaIndex != null && estacaConsultadaIndex !== gps.estacaAtivaIndex;
   const estacaConsultada = emConsulta ? estacas[estacaConsultadaIndex!] : null;
+  // os cards de Faixa (com os 9 parâmetros) precisam refletir a estaca
+  // CONSULTADA quando houver uma — antes liam sempre `estacaAtiva`, direto,
+  // ignorando por completo o clique na régua (bug relatado na rodada 5).
+  const estacaExibida = estacaConsultada ?? estacaAtiva;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-3 overscroll-y-contain p-3">
@@ -232,9 +236,9 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
             fieldLogs={fieldLogs}
             onConsultarHodometro={setEstacaConsultadaIndex}
           />
-          <div className={`min-w-0 flex-1 ${gridFaixasClassName(estacaAtiva.faixas.length)}`}>
-            {estacaAtiva.faixas.map((faixa) => {
-              const key = fieldLogKey(estacaAtiva.id, faixa.numero);
+          <div className={`min-w-0 flex-1 ${gridFaixasClassName(estacaExibida.faixas.length)}`}>
+            {estacaExibida.faixas.map((faixa) => {
+              const key = fieldLogKey(estacaExibida.id, faixa.numero);
               const log = fieldLogs.get(key);
               return (
                 <FaixaCard
@@ -244,7 +248,7 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
                   parametros={faixa.parametros}
                   limiaresTolerancia={limiaresTolerancia}
                   nota={log?.notaCampo}
-                  onAlterar={() => setFaixaEmEdicao(faixa.numero)}
+                  onAlterar={emConsulta ? undefined : () => setFaixaEmEdicao(faixa.numero)}
                 />
               );
             })}

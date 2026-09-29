@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Estaca, ImportResult } from '../../types/domain';
 import type { NormalizationConfig } from '../../services/normalizer';
@@ -99,5 +99,112 @@ describe('VistoriaScreen — Alterações reflete alteração confirmada (regres
     expect(await screen.findByText('REX', { selector: 'span' })).toBeInTheDocument();
     expect(screen.getByText('Faixa 1')).toBeInTheDocument();
     expect(screen.getByText('Reverter')).toBeInTheDocument();
+  });
+});
+
+// Regressão rodada 5 (bug da rodada 4 não foi corrigido de fato): clicar em
+// posições diferentes da régua não atualizava os valores exibidos nos cards
+// de Faixa 1/2/3, mesmo com o estado de "estaca consultada" mudando
+// corretamente — os cards liam sempre `estacaAtiva`, nunca a estaca
+// consultada. Este teste sobe a TELA INTEIRA (régua real + cards reais,
+// contra Dexie real) e verifica o TEXTO renderizado nos cards a cada
+// clique, não só o estado interno — exatamente o que faltou na rodada 4.
+
+function estacaComIri(id: number, hodometroContinuo: number, iri: number): Estaca {
+  return {
+    id,
+    numeroEstaca: `0+${Math.round(hodometroContinuo * 1000)}`,
+    hodometroContinuo,
+    hodometroMarco: `0+${Math.round(hodometroContinuo * 1000)}`,
+    latitude: null,
+    longitude: null,
+    tipoSecao: null,
+    marcoKm: null,
+    observacaoOriginal: null,
+    dreno: 'ausente',
+    faixas: [{ numero: 1, parametros: { iri }, solucoesOriginais: [] }],
+  };
+}
+
+describe('VistoriaScreen — clique na régua atualiza os cards de Faixa (regressão pós-rodada-4)', () => {
+  it('clicar em 3 posições diferentes da régua muda o IRI exibido no card a cada clique, refletindo a estaca clicada', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 0, left: 0, right: 88, bottom: 420, width: 88, height: 420, x: 0, y: 0, toJSON: () => {},
+    });
+
+    const estacas = [
+      estacaComIri(0, 0, 1.11),
+      estacaComIri(1, 0.5, 2.22),
+      estacaComIri(2, 1, 3.33),
+      estacaComIri(3, 1.5, 4.44),
+      estacaComIri(4, 2, 5.55),
+    ];
+    const projectId = await createProjectFromImport(buildImportResult(estacas));
+
+    render(
+      <VistoriaScreen
+        projectId={projectId}
+        config={CONFIG}
+        limiaresTolerancia={null}
+        onVoltar={() => {}}
+        onExportar={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('Alterar')).toBeInTheDocument());
+
+    // estaca ativa é a índice 0 (sem GPS travado em teste) — IRI inicial 1,11
+    expect(screen.getByText('1,11')).toBeInTheDocument();
+
+    // "ver trecho todo" torna a janela da régua = [hodômetro mín, hodômetro
+    // máx] inteiro, com altura determinística — sem isso a régua só mostra
+    // uma janela de ~2km à frente da estaca ativa, e nem toda estaca do
+    // teste caberia num único clique.
+    await user.click(screen.getByText('ver trecho todo'));
+    const regua = screen.getByRole('button', { name: /Régua de consulta/i });
+
+    // clique 1: topo da régua = hodômetro maior = estaca 4 (IRI 5,55)
+    fireEvent.click(regua, { clientY: 10 });
+    await waitFor(() => expect(screen.getByText('5,55')).toBeInTheDocument());
+    expect(screen.queryByText('1,11')).not.toBeInTheDocument();
+
+    // clique 2: meio da régua = estaca intermediária (IRI 3,33)
+    fireEvent.click(regua, { clientY: 240 });
+    await waitFor(() => expect(screen.getByText('3,33')).toBeInTheDocument());
+    expect(screen.queryByText('5,55')).not.toBeInTheDocument();
+
+    // clique 3: fundo da régua = hodômetro menor = estaca 0 (volta ao IRI ativo, 1,11)
+    fireEvent.click(regua, { clientY: 470 });
+    await waitFor(() => expect(screen.getByText('1,11')).toBeInTheDocument());
+    expect(screen.queryByText('3,33')).not.toBeInTheDocument();
+  });
+
+  it('enquanto consulta outra estaca, "Alterar" fica desabilitado — nunca edita a estaca errada', async () => {
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 0, left: 0, right: 88, bottom: 420, width: 88, height: 420, x: 0, y: 0, toJSON: () => {},
+    });
+
+    const estacas = [estacaComIri(0, 0, 1.11), estacaComIri(1, 1, 9.99)];
+    const projectId = await createProjectFromImport(buildImportResult(estacas));
+
+    render(
+      <VistoriaScreen
+        projectId={projectId}
+        config={CONFIG}
+        limiaresTolerancia={null}
+        onVoltar={() => {}}
+        onExportar={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('Alterar')).toBeInTheDocument());
+    expect(screen.getByText('Alterar')).toBeEnabled();
+
+    const regua = screen.getByRole('button', { name: /Régua de consulta/i });
+    fireEvent.click(regua, { clientY: 10 }); // consulta a outra estaca
+
+    await waitFor(() => expect(screen.getByText('9,99')).toBeInTheDocument());
+    expect(screen.getByText('Alterar')).toBeDisabled();
   });
 });
