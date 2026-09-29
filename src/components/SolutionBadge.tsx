@@ -15,8 +15,9 @@ function formatarComplementar(valor: number | undefined): string | null {
  */
 interface Props {
   solucao: NormalizedSolution;
-  // painel de consulta da régua: texto pela metade do tamanho normal, o chip
-  // inteiro (não só a fonte) fica mais compacto pra caber nas colunas finas.
+  // painel de consulta da régua: chip compacto, mas do mesmo tamanho de
+  // texto que os rótulos "F1"/"Dreno" daquele mesmo painel (10px) — a
+  // rodada 6 tinha encolhido demais (7px), a ponto de ficar difícil de ler.
   compacto?: boolean;
 }
 
@@ -30,7 +31,7 @@ export function SolutionBadge({ solucao, compacto }: Props) {
     <span
       title={titulo}
       className={`inline-flex max-w-full items-center gap-1 overflow-hidden rounded-full border bg-white font-bold text-neutral-800 ${
-        compacto ? 'h-4 px-1 text-[7px]' : 'h-7 px-2 text-sm'
+        compacto ? 'h-5 px-1.5 text-[10px]' : 'h-7 px-2 text-sm'
       }`}
       style={{ borderColor: cor }}
     >

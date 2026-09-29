@@ -76,6 +76,14 @@ export function VerticalRuler({ estacas, estacaAtivaIndex, estacaConsultadaIndex
   const [modoCompleto, setModoCompleto] = useState(false);
   const [legendaAberta, setLegendaAberta] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  // item 2 da rodada 7: arrastar a régua com o dedo pra navegar pra
+  // frente/trás sem depender do GPS. `seguindoAtiva=false` destrava a janela
+  // da posição da estaca ativa; só volta a acompanhar o GPS de novo quando o
+  // operador toca em "centralizar" — nunca sozinho, nunca redefine qual
+  // estaca é a ativa (isso continua 100% do motor de GPS).
+  const [seguindoAtiva, setSeguindoAtiva] = useState(true);
+  const [inicioManual, setInicioManual] = useState<number | null>(null);
+  const arrastoRef = useRef<{ startY: number; startInicio: number; moved: boolean } | null>(null);
 
   const estacaAtiva = estacas[estacaAtivaIndex];
   const faixasNumeros = useMemo(() => estacaAtiva?.faixas.map((f) => f.numero) ?? [], [estacaAtiva]);
@@ -86,13 +94,17 @@ export function VerticalRuler({ estacas, estacaAtivaIndex, estacaConsultadaIndex
 
   const janela = useMemo(() => {
     if (modoCompleto) return { inicio: hodometroMin, fim: hodometroMax };
+    if (!seguindoAtiva && inicioManual !== null) {
+      const inicio = Math.max(hodometroMin, Math.min(inicioManual, hodometroMax - JANELA_KM_TOTAL));
+      return { inicio, fim: Math.min(hodometroMax, inicio + JANELA_KM_TOTAL) };
+    }
     const atras = JANELA_KM_TOTAL * JANELA_FRACAO_ATRAS;
     const frente = JANELA_KM_TOTAL - atras;
     return {
       inicio: Math.max(hodometroMin, (estacaAtiva?.hodometroContinuo ?? 0) - atras),
       fim: Math.min(hodometroMax, (estacaAtiva?.hodometroContinuo ?? 0) + frente),
     };
-  }, [modoCompleto, estacaAtiva, hodometroMin, hodometroMax]);
+  }, [modoCompleto, estacaAtiva, hodometroMin, hodometroMax, seguindoAtiva, inicioManual]);
 
   const totalKm = Math.max(janela.fim - janela.inicio, 0.001);
   const alturaPx = modoCompleto ? Math.max(ALTURA_JANELA_PX, totalKm * 240) : ALTURA_JANELA_PX;
@@ -126,10 +138,10 @@ export function VerticalRuler({ estacas, estacaAtivaIndex, estacaConsultadaIndex
     return marcas;
   }, [janela, passoKm]);
 
-  function aoTocarNaRegua(e: React.MouseEvent<HTMLDivElement>) {
+  function aoTocarNaRegua(clientY: number) {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const y = e.clientY - rect.top;
+    const y = clientY - rect.top;
     const hodometroTocado = janela.inicio + (alturaPx - y) / pxPerKm;
     let maisProxima = estacas[0];
     let menorDiff = Infinity;
@@ -143,12 +155,53 @@ export function VerticalRuler({ estacas, estacaAtivaIndex, estacaConsultadaIndex
     onConsultarHodometro(estacas.indexOf(maisProxima));
   }
 
+  const LIMIAR_ARRASTO_PX = 8;
+
+  function aoPressionarRegua(e: React.PointerEvent<HTMLDivElement>) {
+    // sempre registra o toque, mesmo em "ver trecho todo" — só o PAN por
+    // arrasto não se aplica nesse modo (ver abaixo); o toque simples pra
+    // consultar uma posição continua funcionando em qualquer modo.
+    arrastoRef.current = { startY: e.clientY, startInicio: janela.inicio, moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function aoMoverNaRegua(e: React.PointerEvent<HTMLDivElement>) {
+    const arrasto = arrastoRef.current;
+    if (!arrasto) return;
+    const deltaY = e.clientY - arrasto.startY;
+    if (Math.abs(deltaY) > LIMIAR_ARRASTO_PX) arrasto.moved = true;
+    if (!arrasto.moved || modoCompleto) return; // "ver trecho todo" já mostra tudo, nada pra arrastar
+    // ponto sob o dedo continua sob o dedo (rolagem natural) — nunca redefine
+    // a estaca ativa, só desloca a janela visível.
+    setSeguindoAtiva(false);
+    setInicioManual(arrasto.startInicio + deltaY / pxPerKm);
+  }
+
+  function aoSoltarRegua(e: React.PointerEvent<HTMLDivElement>) {
+    const arrasto = arrastoRef.current;
+    arrastoRef.current = null;
+    if (!arrasto) return;
+    if (!arrasto.moved) aoTocarNaRegua(e.clientY); // foi um toque, não um arrasto — consulta normal
+  }
+
+  function centralizarNaEstacaAtiva() {
+    setSeguindoAtiva(true);
+    setInicioManual(null);
+  }
+
   return (
     <div className="flex shrink-0 flex-col gap-2" style={{ width: RULER_WIDTH_PX + 40 }}>
       <div className="flex items-center justify-between text-[10px] font-bold text-neutral-500">
         <button onClick={() => setModoCompleto((v) => !v)} className="underline">
           {modoCompleto ? 'ver janela' : 'ver trecho todo'}
         </button>
+        {/* só aparece depois que o operador arrasta a régua pra outro lugar —
+            "centralizar" volta a acompanhar a estaca ativa do GPS. */}
+        {!seguindoAtiva && !modoCompleto && (
+          <button onClick={centralizarNaEstacaAtiva} className="text-ocre-dark underline">
+            centralizar
+          </button>
+        )}
       </div>
 
       <div className="relative flex" style={{ height: alturaPx }}>
@@ -164,11 +217,13 @@ export function VerticalRuler({ estacas, estacaAtivaIndex, estacaConsultadaIndex
 
         <div
           ref={containerRef}
-          onClick={aoTocarNaRegua}
+          onPointerDown={aoPressionarRegua}
+          onPointerMove={aoMoverNaRegua}
+          onPointerUp={aoSoltarRegua}
           role="button"
           tabIndex={0}
-          aria-label="Régua de consulta por hodômetro — toque para consultar uma posição"
-          className={`relative overflow-hidden rounded-md border border-neutral-300 bg-neutral-50 ${modoCompleto ? 'overflow-y-auto' : ''}`}
+          aria-label="Régua de consulta por hodômetro — toque para consultar uma posição, ou arraste pra navegar"
+          className={`relative touch-none overflow-hidden rounded-md border border-neutral-300 bg-neutral-50 ${modoCompleto ? 'overflow-y-auto' : ''}`}
           style={{ width: RULER_WIDTH_PX }}
         >
           {segmentosPorFaixa.map((faixa, faixaIdx) => (

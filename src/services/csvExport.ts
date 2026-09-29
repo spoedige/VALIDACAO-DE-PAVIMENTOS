@@ -48,6 +48,23 @@ export function buildCsv(projeto: Projeto, estacas: Estaca[], fieldLogs: FieldLo
   return linhas.join('\n');
 }
 
+/**
+ * Download direto (sem passar pela folha de compartilhamento) — item 5 da
+ * rodada 7: em alguns aparelhos, a folha de compartilhamento nativa não tem
+ * um jeito óbvio de "salvar no aparelho", então o operador precisa de um
+ * botão explícito de baixar, não só do fallback automático quando cancela o
+ * compartilhamento.
+ */
+export function downloadArquivo(conteudo: string, nomeArquivo: string, tipoMime: string): void {
+  const blob = new Blob([conteudo], { type: tipoMime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeArquivo;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function shareOrDownloadCsv(csv: string, nomeArquivo: string): Promise<'compartilhado' | 'baixado'> {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const file = new File([blob], nomeArquivo, { type: 'text/csv' });
@@ -61,11 +78,6 @@ export async function shareOrDownloadCsv(csv: string, nomeArquivo: string): Prom
     }
   }
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = nomeArquivo;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadArquivo(csv, nomeArquivo, 'text/csv;charset=utf-8');
   return 'baixado';
 }

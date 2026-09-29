@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Estaca, ImportResult, NormalizedSolution } from '../../types/domain';
@@ -50,6 +50,10 @@ function buildImportResult(estacas: Estaca[]): ImportResult {
     canProceed: true,
   };
 }
+
+beforeEach(() => {
+  Element.prototype.setPointerCapture = vi.fn();
+});
 
 afterEach(async () => {
   cleanup();
@@ -110,6 +114,14 @@ describe('VistoriaScreen — Alterações reflete alteração confirmada (regres
 // contra Dexie real) e verifica o TEXTO renderizado nos cards a cada
 // clique, não só o estado interno — exatamente o que faltou na rodada 4.
 
+// item 2 da rodada 7: a régua trocou onClick por pointerdown/move/up (pra
+// suportar arrastar) — "tocar" nos testes agora é pointerdown+pointerup sem
+// pointermove no meio (jsdom não implementa setPointerCapture; stubado).
+function tocarRegua(elemento: Element, clientY: number) {
+  fireEvent.pointerDown(elemento, { clientY });
+  fireEvent.pointerUp(elemento, { clientY });
+}
+
 function estacaComIri(id: number, hodometroContinuo: number, iri: number): Estaca {
   return {
     id,
@@ -165,17 +177,17 @@ describe('VistoriaScreen — clique na régua atualiza os cards de Faixa (regres
     const regua = screen.getByRole('button', { name: /Régua de consulta/i });
 
     // clique 1: topo da régua = hodômetro maior = estaca 4 (IRI 5,55)
-    fireEvent.click(regua, { clientY: 10 });
+    tocarRegua(regua, 10);
     await waitFor(() => expect(screen.getByText('5,55')).toBeInTheDocument());
     expect(screen.queryByText('1,11')).not.toBeInTheDocument();
 
     // clique 2: meio da régua = estaca intermediária (IRI 3,33)
-    fireEvent.click(regua, { clientY: 240 });
+    tocarRegua(regua, 240);
     await waitFor(() => expect(screen.getByText('3,33')).toBeInTheDocument());
     expect(screen.queryByText('5,55')).not.toBeInTheDocument();
 
     // clique 3: fundo da régua = hodômetro menor = estaca 0 (volta ao IRI ativo, 1,11)
-    fireEvent.click(regua, { clientY: 470 });
+    tocarRegua(regua, 470);
     await waitFor(() => expect(screen.getByText('1,11')).toBeInTheDocument());
     expect(screen.queryByText('3,33')).not.toBeInTheDocument();
   });
@@ -202,7 +214,7 @@ describe('VistoriaScreen — clique na régua atualiza os cards de Faixa (regres
     await waitFor(() => expect(screen.getByText('Alterar')).toBeInTheDocument());
 
     const regua = screen.getByRole('button', { name: /Régua de consulta/i });
-    fireEvent.click(regua, { clientY: 10 }); // consulta a outra estaca (índice 1, não a ativa)
+    tocarRegua(regua, 10); // consulta a outra estaca (índice 1, não a ativa)
     await waitFor(() => expect(screen.getByText('9,99')).toBeInTheDocument());
 
     // "Alterar" continua habilitado durante a consulta — o item 3 da rodada

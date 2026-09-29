@@ -25,6 +25,10 @@ export function MapaReal({ estacas, estacaAtualIndex }: Props) {
   const marcadorRef = useRef<L.CircleMarker | null>(null);
   const [online, setOnline] = useState(navigator.onLine);
   const [tilesFalharam, setTilesFalharam] = useState(false);
+  // segue a posição atual automaticamente (item 3 da rodada 7) até o
+  // operador arrastar o mapa manualmente pra olhar outro lugar — aí destrava
+  // e só volta a seguir quando ele tocar o botão de centralizar de novo.
+  const seguindoRef = useRef(true);
 
   useEffect(() => {
     const aoFicarOnline = () => setOnline(true);
@@ -61,6 +65,12 @@ export function MapaReal({ estacas, estacaAtualIndex }: Props) {
       tiles.addTo(map);
       mapRef.current = map;
 
+      // só um arrasto de verdade do operador destrava o "seguir" — zoom (que
+      // o próprio `flyTo`/`panTo` programático também dispara) não conta.
+      map.on('dragstart', () => {
+        seguindoRef.current = false;
+      });
+
       const todos = pontosValidos.map((p) => [p.lat, p.lon] as [number, number]);
       L.polyline(todos, { color: '#9ca3af', weight: 2 }).addTo(map);
       trilhaRef.current = L.polyline([], { color: '#2563eb', weight: 3 }).addTo(map);
@@ -83,6 +93,7 @@ export function MapaReal({ estacas, estacaAtualIndex }: Props) {
     trilhaRef.current?.setLatLngs(trilha);
     const atual = pontosValidos.find((p) => p.i === estacaAtualIndex) ?? pontosValidos[pontosValidos.length - 1];
     marcadorRef.current?.setLatLng([atual.lat, atual.lon]);
+    if (seguindoRef.current) mapRef.current.panTo([atual.lat, atual.lon], { animate: true });
   }, [estacaAtualIndex, pontosValidos]);
 
   useEffect(() => {
@@ -95,6 +106,7 @@ export function MapaReal({ estacas, estacaAtualIndex }: Props) {
   function centralizar() {
     const atual = pontosValidos.find((p) => p.i === estacaAtualIndex) ?? pontosValidos[pontosValidos.length - 1];
     if (!mapRef.current || !atual) return;
+    seguindoRef.current = true; // volta a seguir a posição atual automaticamente
     mapRef.current.flyTo([atual.lat, atual.lon], Math.max(mapRef.current.getZoom(), 14));
   }
 

@@ -13,6 +13,7 @@ import {
 } from '../db/projectService';
 import { useGps, MENSAGEM_PERMISSAO_NEGADA } from '../hooks/useGps';
 import { useWakeLock } from '../hooks/useWakeLock';
+import { useMunicipioAtual } from '../hooks/useMunicipioAtual';
 import { FaixaCard } from '../components/FaixaCard';
 import { AlteracaoBottomSheet } from '../components/AlteracaoBottomSheet';
 import { AlteracoesTab } from '../components/AlteracoesTab';
@@ -106,6 +107,7 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
   );
   const gps = useGps(estacasGps, 0);
   useWakeLock(true);
+  const municipioAtual = useMunicipioAtual(gps.sessaoInfo.latitude, gps.sessaoInfo.longitude);
 
   if (!projeto || !estacas) return <p className="p-4 text-neutral-600">Carregando…</p>;
 
@@ -192,6 +194,17 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
             localização (em navegadores como o Brave, isso costuma ficar em Configurações do site → Localização).
           </p>
         )}
+        {gps.sessaoInfo.latitude !== null && gps.sessaoInfo.longitude !== null && (
+          <p className="mt-1 text-[10px] text-neutral-500">
+            {municipioAtual.municipio
+              ? `${municipioAtual.municipio.nome}${municipioAtual.municipio.uf ? ` - ${municipioAtual.municipio.uf}` : ''}${municipioAtual.desatualizado ? ' (último registrado, sem sinal agora)' : ''}`
+              : municipioAtual.carregando
+                ? 'Localizando município…'
+                : 'Município indisponível offline'}
+            {' · '}
+            {gps.sessaoInfo.latitude.toFixed(5)}, {gps.sessaoInfo.longitude.toFixed(5)}
+          </p>
+        )}
       </div>
 
       {emConsulta && estacaConsultada && (
@@ -226,7 +239,7 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
             <div className="flex min-w-0 flex-col gap-1">
               <span className="truncate text-[10px] font-bold text-neutral-500">Dreno</span>
               <span
-                className="inline-flex h-4 max-w-full items-center gap-1 truncate rounded-full border px-1 text-[7px] font-bold text-neutral-800"
+                className="inline-flex h-5 max-w-full items-center gap-1 truncate rounded-full border px-1.5 text-[10px] font-bold text-neutral-800"
                 style={{ borderColor: CORES_DRENO[estacaConsultada.dreno] }}
               >
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: CORES_DRENO[estacaConsultada.dreno] }} />

@@ -17,7 +17,12 @@ function formatarValor(v: string | number | undefined): string {
   return typeof v === 'number' ? v.toLocaleString('pt-BR', { maximumFractionDigits: 3 }) : v;
 }
 
-/** Modo Parâmetros — seção 7: tabela transposta, parâmetros nas linhas, faixas nas colunas. */
+/**
+ * Modo Parâmetros — seção 7: tabela transposta, parâmetros nas linhas,
+ * faixas nas colunas. Linhas zebradas e divisor vertical entre colunas de
+ * faixa (item 4 da rodada 7) — só pra facilitar a leitura, nenhuma regra de
+ * negócio depende disso.
+ */
 export function ParametrosTable({ estaca }: { estaca: Estaca }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-neutral-300 bg-white">
@@ -25,19 +30,19 @@ export function ParametrosTable({ estaca }: { estaca: Estaca }) {
         <thead>
           <tr className="border-b border-neutral-300">
             <th className="p-2 text-left font-bold text-neutral-500">Parâmetro</th>
-            {estaca.faixas.map((f) => (
-              <th key={f.numero} className="p-2 text-right font-bold text-neutral-900">
+            {estaca.faixas.map((f, i) => (
+              <th key={f.numero} className={`p-2 text-right font-bold text-neutral-900 ${i > 0 ? 'border-l border-neutral-300' : ''}`}>
                 Faixa {f.numero}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {LINHAS.map((linha) => (
-            <tr key={linha.key} className="border-b border-neutral-100">
+          {LINHAS.map((linha, i) => (
+            <tr key={linha.key} className={`border-b border-neutral-100 ${i % 2 === 1 ? 'bg-neutral-50' : ''}`}>
               <td className="p-2 text-neutral-600">{linha.label}</td>
-              {estaca.faixas.map((f) => (
-                <td key={f.numero} className="p-2 text-right font-bold tabular-nums text-neutral-900">
+              {estaca.faixas.map((f, j) => (
+                <td key={f.numero} className={`p-2 text-right font-bold tabular-nums text-neutral-900 ${j > 0 ? 'border-l border-neutral-200' : ''}`}>
                   {formatarValor(f.parametros[linha.key])}
                 </td>
               ))}

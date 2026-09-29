@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { getProject, getStations, getFieldLogsByProject } from '../db/projectService';
-import { buildCsv, shareOrDownloadCsv } from '../services/csvExport';
+import { buildCsv, shareOrDownloadCsv, downloadArquivo } from '../services/csvExport';
 import { buildCheckpoint, checkpointHashMatches, restoreCheckpoint } from '../db/checkpoint';
 import type { Checkpoint } from '../types/domain';
 
@@ -14,27 +14,51 @@ export function ExportScreen({ projectId, onVoltar }: Props) {
   const [avisoHash, setAvisoHash] = useState<{ checkpoint: Checkpoint } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  async function exportarCsv() {
+  async function montarCsv(): Promise<{ nome: string; csv: string } | null> {
     const projeto = await getProject(projectId);
-    if (!projeto) return;
+    if (!projeto) return null;
     const estacas = await getStations(projectId);
     const fieldLogs = await getFieldLogsByProject(projectId);
     if (fieldLogs.length === 0) {
       setStatus('Nenhuma estaca/faixa foi alterada — não há nada para exportar ainda.');
-      return;
+      return null;
     }
-    const csv = buildCsv(projeto, estacas, fieldLogs);
-    const resultado = await shareOrDownloadCsv(csv, `${projeto.nomeProjeto}.csv`);
+    return { nome: `${projeto.nomeProjeto}.csv`, csv: buildCsv(projeto, estacas, fieldLogs) };
+  }
+
+  async function compartilharCsv() {
+    const dados = await montarCsv();
+    if (!dados) return;
+    const resultado = await shareOrDownloadCsv(dados.csv, dados.nome);
     setStatus(resultado === 'compartilhado' ? 'CSV compartilhado.' : 'CSV baixado.');
   }
 
-  async function exportarCheckpoint() {
+  async function baixarCsv() {
+    const dados = await montarCsv();
+    if (!dados) return;
+    downloadArquivo(dados.csv, dados.nome, 'text/csv;charset=utf-8');
+    setStatus('CSV baixado.');
+  }
+
+  async function montarCheckpoint(): Promise<{ nome: string; json: string } | null> {
     const projeto = await getProject(projectId);
-    if (!projeto) return;
+    if (!projeto) return null;
     const checkpoint = await buildCheckpoint(projeto);
-    const json = JSON.stringify(checkpoint, null, 2);
-    const resultado = await shareOrDownloadCsv(json, `${projeto.nomeProjeto}-checkpoint.json`);
+    return { nome: `${projeto.nomeProjeto}-checkpoint.json`, json: JSON.stringify(checkpoint, null, 2) };
+  }
+
+  async function compartilharCheckpoint() {
+    const dados = await montarCheckpoint();
+    if (!dados) return;
+    const resultado = await shareOrDownloadCsv(dados.json, dados.nome);
     setStatus(resultado === 'compartilhado' ? 'Checkpoint compartilhado.' : 'Checkpoint baixado.');
+  }
+
+  async function baixarCheckpoint() {
+    const dados = await montarCheckpoint();
+    if (!dados) return;
+    downloadArquivo(dados.json, dados.nome, 'application/json');
+    setStatus('Checkpoint baixado.');
   }
 
   async function aoSelecionarCheckpoint(file: File) {
@@ -56,12 +80,29 @@ export function ExportScreen({ projectId, onVoltar }: Props) {
       </button>
       <h1 className="text-2xl font-bold text-neutral-900">Exportar</h1>
 
-      <button onClick={exportarCsv} className="h-14 rounded-lg bg-neutral-900 font-bold text-white">
-        Exportar CSV (estacas/faixas alteradas)
-      </button>
-      <button onClick={exportarCheckpoint} className="h-14 rounded-lg border-2 border-neutral-900 font-bold text-neutral-900">
-        Gerar Checkpoint
-      </button>
+      <div className="flex flex-col gap-2 rounded-lg border border-neutral-300 bg-white p-3">
+        <span className="text-sm font-bold text-neutral-500">CSV (estacas/faixas alteradas)</span>
+        <div className="flex gap-2">
+          <button onClick={compartilharCsv} className="h-14 flex-1 rounded-lg bg-neutral-900 font-bold text-white">
+            Compartilhar
+          </button>
+          <button onClick={baixarCsv} className="h-14 flex-1 rounded-lg border-2 border-neutral-900 font-bold text-neutral-900">
+            Baixar arquivo
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-lg border border-neutral-300 bg-white p-3">
+        <span className="text-sm font-bold text-neutral-500">Checkpoint (backup completo do projeto)</span>
+        <div className="flex gap-2">
+          <button onClick={compartilharCheckpoint} className="h-14 flex-1 rounded-lg bg-neutral-900 font-bold text-white">
+            Compartilhar
+          </button>
+          <button onClick={baixarCheckpoint} className="h-14 flex-1 rounded-lg border-2 border-neutral-900 font-bold text-neutral-900">
+            Baixar arquivo
+          </button>
+        </div>
+      </div>
 
       <input
         ref={inputRef}
