@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { DrenoStatus, Estaca, FieldLog, NormalizedSolution } from '../types/domain';
 import { fieldLogKey } from '../db/projectService';
 import { solutionSetsEqual } from '../db/solutionSet';
-import { PALETA_SOLUCOES, CORES_DRENO, corSolucao } from '../config/paleta';
+import { entradasLegenda, CORES_DRENO, corSolucao } from '../config/paleta';
 
 // Régua vertical (seção 6 da atualização de UX) — substitui o mini-unifilar
 // horizontal. Cima = à frente, linha da posição atual = onde estou, baixo =
@@ -303,7 +303,7 @@ export function VerticalRuler({ estacas, estacaAtivaIndex, estacaConsultadaIndex
 }
 
 function RulerLegend({ aberta, onToggle }: { aberta: boolean; onToggle: () => void }) {
-  const entradas = Object.values(PALETA_SOLUCOES);
+  const entradas = entradasLegenda();
   return (
     <div className="rounded-md border border-neutral-200 bg-white p-1.5">
       <button onClick={onToggle} className="mb-1 text-[9px] font-bold text-neutral-500 underline">

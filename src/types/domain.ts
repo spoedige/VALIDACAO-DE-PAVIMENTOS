@@ -65,12 +65,27 @@ export interface ProjetoMetadata {
   dataImport: string; // ISO
 }
 
+// Cadastro feito pelo usuário pra uma célula de solução que o normalizador não
+// reconheceu (UNKNOWN). Vale só pra este projeto e é aplicado na leitura — o
+// valor bruto da planilha nunca é alterado no banco.
+export type DestinoCadastro =
+  // passa a valer como uma legenda já existente; `comEspessura` = usar o número da célula como espessura (cm), só pra subtipos que levam espessura
+  | { tipo: 'legenda'; categoriaPai: CategoriaPai; subtipoCodigo: string; comEspessura?: boolean }
+  | { tipo: 'personalizada'; nome: string; cor: string }; // legenda própria: nome + cor escolhidos pelo usuário
+
+export interface CadastroSolucao {
+  categoriaPai: CategoriaPai; // coluna da planilha onde a célula apareceu
+  textoCelula: string; // String(valorBruto), exatamente como veio
+  destino: DestinoCadastro;
+}
+
 export interface Projeto {
   projectId: string; // UUID, gerado na importação, nunca muda
   sourceFileHash: string; // SHA-256 dos bytes brutos do .xlsx original
   sourceFileName: string;
   nomeProjeto: string; // editável pelo usuário
   metadata: ProjetoMetadata;
+  cadastrosSolucao?: CadastroSolucao[]; // opcional: projetos antigos não têm
 }
 
 export interface FieldLog {
@@ -135,5 +150,6 @@ export interface Checkpoint {
   estacas: Estaca[];
   fieldLogs: FieldLog[];
   fieldChangeHistory: FieldChangeHistoryEntry[];
+  cadastrosSolucao?: CadastroSolucao[];
   exportedAt: string; // ISO
 }

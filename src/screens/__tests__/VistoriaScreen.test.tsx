@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import type { Estaca, ImportResult, NormalizedSolution } from '../../types/domain';
 import type { NormalizationConfig } from '../../services/normalizer';
 import { db } from '../../db/schema';
-import { createProjectFromImport } from '../../db/projectService';
+import { createProjectFromImport, getProject } from '../../db/projectService';
+import { registrarLegendasPersonalizadas } from '../../config/paleta';
 import { VistoriaScreen } from '../VistoriaScreen';
 
 // Regressão pós-rodada-3 (correção urgente): confirmar uma alteração de
@@ -57,6 +58,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   cleanup();
+  registrarLegendasPersonalizadas([]);
   await db.projects.clear();
   await db.stations.clear();
   await db.fieldLogs.clear();
@@ -382,5 +384,36 @@ describe('VistoriaScreen — erros cadastrais (solução UNKNOWN)', () => {
     render(<VistoriaScreen projectId={projectId} config={CONFIG} limiaresTolerancia={null} onVoltar={() => {}} onExportar={() => {}} />);
     await waitFor(() => expect(screen.getByText('Alterar')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /Erros cadastrais/ })).not.toBeInTheDocument();
+  });
+
+  it('resolver pela tela com legenda própria: chip troca ⚠ por nome+cor, persiste no projeto e dá pra desfazer', async () => {
+    const user = userEvent.setup();
+    const projectId = await createProjectFromImport(buildImportResult([estacaComUnknown(0, 3), estacaComUnknown(1, 3)]));
+    render(<VistoriaScreen projectId={projectId} config={CONFIG} limiaresTolerancia={null} onVoltar={() => {}} onExportar={() => {}} />);
+    await waitFor(() => expect(screen.getByText('Alterar')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Erros cadastrais: 2/ }));
+    await user.click(await screen.findByText('Resolver'));
+    await user.click(screen.getByRole('radio', { name: 'Criar legenda própria' }));
+    await user.type(screen.getByLabelText(/Nome da legenda/), 'GAP');
+    await user.click(screen.getByText('Salvar'));
+
+    // sem pendências: o painel diz isso e lista o cadastro feito
+    expect(await screen.findByText('Nenhuma solução pendente.')).toBeInTheDocument();
+    expect(screen.getByText(/GAP \(legenda própria\)/)).toBeInTheDocument();
+    expect((await getProject(projectId))?.cadastrosSolucao).toHaveLength(1);
+
+    // o botão do topo vira "✓ 0" (continua acessível pra desfazer) e o chip da faixa passa a ser GAP
+    expect(screen.getByRole('button', { name: /Erros cadastrais: 0/ })).toBeInTheDocument();
+    await user.click(screen.getByText('Fechar'));
+    // aparece no chip da faixa E na legenda da régua (a legenda lista as oficiais + as próprias)
+    expect(screen.getAllByText('GAP').length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByRole('img', { name: 'Erro cadastral' })).not.toBeInTheDocument();
+
+    // desfazer devolve o erro cadastral
+    await user.click(screen.getByRole('button', { name: /Erros cadastrais: 0/ }));
+    await user.click(await screen.findByRole('button', { name: /Desfazer cadastro de "3"/ }));
+    expect(await screen.findByText('Erros cadastrais (2)')).toBeInTheDocument();
+    expect((await getProject(projectId))?.cadastrosSolucao).toHaveLength(0);
   });
 });

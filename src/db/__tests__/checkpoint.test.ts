@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Estaca, ImportResult } from '../../types/domain';
 import { db } from '../schema';
-import { applyFieldChange, createProjectFromImport, getProject } from '../projectService';
+import { applyFieldChange, createProjectFromImport, getProject, getStations, getStationsBrutas, salvarCadastroSolucao } from '../projectService';
 import { buildCheckpoint, checkpointHashMatches, restoreCheckpoint } from '../checkpoint';
 
 function estaca(id: number): Estaca {
@@ -85,5 +85,34 @@ describe('checkpoint', () => {
     const checkpoint = await buildCheckpoint(projeto);
 
     await expect(restoreCheckpoint(checkpoint, { sourceFileHashCarregado: 'hash-diferente', force: true })).resolves.not.toThrow();
+  });
+});
+
+describe('checkpoint e cadastro de solução UNKNOWN', () => {
+  it('guarda o dado BRUTO (UNKNOWN) + os cadastros à parte, e a restauração devolve tudo igual', async () => {
+    const e0 = estaca(0);
+    e0.faixas[0].solucoesOriginais = [{ categoriaPai: 'Revest', subtipoCodigo: 'UNKNOWN', valorBruto: 3, normalizationStatus: 'unresolved' }];
+    const projectId = await createProjectFromImport(buildImportResult('hash-c', [e0]));
+    await salvarCadastroSolucao(projectId, { categoriaPai: 'Revest', textoCelula: '3', destino: { tipo: 'personalizada', nome: 'GAP', cor: '#0EA5E9' } });
+
+    const projeto = (await getProject(projectId))!;
+    const checkpoint = await buildCheckpoint(projeto);
+    expect(checkpoint.estacas[0].faixas[0].solucoesOriginais[0].subtipoCodigo).toBe('UNKNOWN'); // não "assou" o cadastro
+    expect(checkpoint.cadastrosSolucao).toHaveLength(1);
+
+    await db.projects.clear();
+    await db.stations.clear();
+    await restoreCheckpoint(checkpoint);
+
+    expect((await getStationsBrutas(projectId))[0].faixas[0].solucoesOriginais[0].subtipoCodigo).toBe('UNKNOWN');
+    expect((await getStations(projectId))[0].faixas[0].solucoesOriginais[0].subtipoCodigo).toBe('PERSONALIZADA:3');
+  });
+
+  it('checkpoint antigo, sem cadastrosSolucao, ainda restaura', async () => {
+    const projectId = await createProjectFromImport(buildImportResult('hash-d', [estaca(0)]));
+    const checkpoint = await buildCheckpoint((await getProject(projectId))!);
+    delete checkpoint.cadastrosSolucao;
+    await restoreCheckpoint(checkpoint);
+    expect((await getProject(projectId))?.cadastrosSolucao).toEqual([]);
   });
 });

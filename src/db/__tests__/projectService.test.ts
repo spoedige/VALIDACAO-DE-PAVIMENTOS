@@ -9,8 +9,13 @@ import {
   getFieldLogsByProject,
   getStations,
   listProjects,
+  getFieldLogsBrutos,
+  getProject,
+  getStationsBrutas,
+  removerCadastroSolucao,
   renameProject,
   reverterEvento,
+  salvarCadastroSolucao,
 } from '../projectService';
 
 function sol(categoriaPai: NormalizedSolution['categoriaPai'], subtipoCodigo: string, valorComplementar?: number): NormalizedSolution {
@@ -200,5 +205,68 @@ describe('reverterEvento (aba Alterações, item 5)', () => {
     expect(estacas).toHaveLength(2);
     expect(estacas[0].hodometroContinuo).toBe(0);
     expect(estacas[1].hodometroContinuo).toBe(0.02);
+  });
+});
+
+describe('cadastro de solução UNKNOWN (aplicado na leitura, dado bruto preservado)', () => {
+  const unknown3 = (): NormalizedSolution => ({ categoriaPai: 'Revest', subtipoCodigo: 'UNKNOWN', valorBruto: 3, normalizationStatus: 'unresolved' });
+
+  it('salvar cadastro muda o que getStations devolve, mas o dado bruto continua UNKNOWN', async () => {
+    const projectId = await createProjectFromImport(buildImportResult([estaca(0, [unknown3()])]));
+    await salvarCadastroSolucao(projectId, { categoriaPai: 'Revest', textoCelula: '3', destino: { tipo: 'personalizada', nome: 'GAP', cor: '#0EA5E9' } });
+
+    const [aplicada] = await getStations(projectId);
+    expect(aplicada.faixas[0].solucoesOriginais[0]).toMatchObject({ subtipoCodigo: 'PERSONALIZADA:3', normalizationStatus: 'recognized' });
+    const [bruta] = await getStationsBrutas(projectId);
+    expect(bruta.faixas[0].solucoesOriginais[0]).toMatchObject({ subtipoCodigo: 'UNKNOWN', normalizationStatus: 'unresolved' });
+  });
+
+  it('cadastrar de novo o mesmo texto troca o destino em vez de duplicar', async () => {
+    const projectId = await createProjectFromImport(buildImportResult([estaca(0, [unknown3()])]));
+    await salvarCadastroSolucao(projectId, { categoriaPai: 'Revest', textoCelula: '3', destino: { tipo: 'personalizada', nome: 'GAP', cor: '#0EA5E9' } });
+    await salvarCadastroSolucao(projectId, { categoriaPai: 'Revest', textoCelula: '3', destino: { tipo: 'legenda', categoriaPai: 'Revest', subtipoCodigo: 'M' } });
+
+    expect((await getProject(projectId))?.cadastrosSolucao).toHaveLength(1);
+    const [aplicada] = await getStations(projectId);
+    expect(aplicada.faixas[0].solucoesOriginais[0]).toMatchObject({ categoriaPai: 'Revest', subtipoCodigo: 'M' });
+  });
+
+  it('desfazer o cadastro devolve UNKNOWN, inclusive em registro de campo que já tinha a legenda própria gravada', async () => {
+    const projectId = await createProjectFromImport(buildImportResult([estaca(0, [unknown3()])]));
+    await salvarCadastroSolucao(projectId, { categoriaPai: 'Revest', textoCelula: '3', destino: { tipo: 'personalizada', nome: 'GAP', cor: '#0EA5E9' } });
+
+    // operador edita a faixa em campo: a legenda própria (já aplicada) é gravada no registro
+    const [estacaAplicada] = await getStations(projectId);
+    const original = estacaAplicada.faixas[0].solucoesOriginais;
+    await applyFieldChange({ projectId, estacaId: 0, faixa: 1, original, novasSolucoes: [...original, sol('Selagem', 'ST')] });
+
+    await removerCadastroSolucao(projectId, 'Revest', '3');
+
+    const [semCadastro] = await getStations(projectId);
+    expect(semCadastro.faixas[0].solucoesOriginais[0]).toMatchObject({ subtipoCodigo: 'UNKNOWN', normalizationStatus: 'unresolved' });
+    const [log] = await getFieldLogsByProject(projectId);
+    expect(log.solucoesCampo.map((s) => s.subtipoCodigo).sort()).toEqual(['ST', 'UNKNOWN']);
+    expect((await getFieldLogsBrutos(projectId))[0].solucoesCampo.map((s) => s.subtipoCodigo)).toContain('PERSONALIZADA:3');
+  });
+
+  it('cadastro de um projeto não vaza pra outro', async () => {
+    const a = await createProjectFromImport(buildImportResult([estaca(0, [unknown3()])]));
+    const b = await createProjectFromImport(buildImportResult([estaca(0, [unknown3()])]));
+    await salvarCadastroSolucao(a, { categoriaPai: 'Revest', textoCelula: '3', destino: { tipo: 'personalizada', nome: 'GAP', cor: '#0EA5E9' } });
+    const [estacaB] = await getStations(b);
+    expect(estacaB.faixas[0].solucoesOriginais[0].normalizationStatus).toBe('unresolved');
+  });
+
+  it('reverter um evento compara com a solução original JÁ cadastrada (sem fieldLog órfão)', async () => {
+    const projectId = await createProjectFromImport(buildImportResult([estaca(0, [unknown3()])]));
+    await salvarCadastroSolucao(projectId, { categoriaPai: 'Revest', textoCelula: '3', destino: { tipo: 'personalizada', nome: 'GAP', cor: '#0EA5E9' } });
+    const [estacaAplicada] = await getStations(projectId);
+    const original = estacaAplicada.faixas[0].solucoesOriginais;
+
+    await applyFieldChange({ projectId, estacaId: 0, faixa: 1, original, novasSolucoes: [sol('Selagem', 'ST')] });
+    const [evento] = await getFieldChangeHistoryByProject(projectId);
+    await reverterEvento(evento.id!);
+
+    expect(await getFieldLogsByProject(projectId)).toHaveLength(0);
   });
 });

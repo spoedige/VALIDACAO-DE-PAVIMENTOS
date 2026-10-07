@@ -1,7 +1,8 @@
-import type { Estaca, FieldChangeHistoryEntry, FieldLog, ImportResult, NormalizedSolution, Projeto } from '../types/domain';
+import type { CadastroSolucao, Estaca, FieldChangeHistoryEntry, FieldLog, ImportResult, NormalizedSolution, Projeto } from '../types/domain';
 import { db, type StationRow } from './schema';
 import { solutionSetsEqual } from './solutionSet';
 import { calcularEstadoAtualDaCadeia } from './historico';
+import { aplicarCadastros } from '../services/cadastroSolucoes';
 
 export interface ProjetoComAtividade extends Projeto {
   ultimaAtividade: string; // ISO — max(fieldLogs.lastModifiedAt) ou metadata.dataImport
@@ -31,8 +32,42 @@ export async function getProject(projectId: string): Promise<Projeto | undefined
   return db.projects.get(projectId);
 }
 
-export async function getStations(projectId: string): Promise<Estaca[]> {
+/** Estacas exatamente como foram importadas — usado pelo checkpoint (backup fiel) e por quem precisa do dado bruto. */
+export async function getStationsBrutas(projectId: string): Promise<Estaca[]> {
   return db.stations.where('projectId').equals(projectId).toArray();
+}
+
+export async function getCadastrosSolucao(projectId: string): Promise<CadastroSolucao[]> {
+  return (await db.projects.get(projectId))?.cadastrosSolucao ?? [];
+}
+
+/** Estacas com os cadastros de solução do usuário aplicados (UNKNOWN → legenda escolhida). */
+export async function getStations(projectId: string): Promise<Estaca[]> {
+  const [estacas, cadastros] = await Promise.all([getStationsBrutas(projectId), getCadastrosSolucao(projectId)]);
+  if (cadastros.length === 0) return estacas;
+  return estacas.map((e) => ({ ...e, faixas: e.faixas.map((f) => ({ ...f, solucoesOriginais: aplicarCadastros(f.solucoesOriginais, cadastros) })) }));
+}
+
+/**
+ * Salva (ou substitui) o cadastro de uma célula não reconhecida. A chave é
+ * coluna + texto da célula: cadastrar de novo o mesmo texto troca o destino.
+ */
+export async function salvarCadastroSolucao(projectId: string, cadastro: CadastroSolucao): Promise<void> {
+  await db.transaction('rw', db.projects, async () => {
+    const projeto = await db.projects.get(projectId);
+    if (!projeto) return;
+    const outros = (projeto.cadastrosSolucao ?? []).filter((c) => !(c.categoriaPai === cadastro.categoriaPai && c.textoCelula === cadastro.textoCelula));
+    await db.projects.update(projectId, { cadastrosSolucao: [...outros, cadastro] });
+  });
+}
+
+export async function removerCadastroSolucao(projectId: string, categoriaPai: CadastroSolucao['categoriaPai'], textoCelula: string): Promise<void> {
+  await db.transaction('rw', db.projects, async () => {
+    const projeto = await db.projects.get(projectId);
+    if (!projeto) return;
+    const restantes = (projeto.cadastrosSolucao ?? []).filter((c) => !(c.categoriaPai === categoriaPai && c.textoCelula === textoCelula));
+    await db.projects.update(projectId, { cadastrosSolucao: restantes });
+  });
 }
 
 /** Renomear só troca `nomeProjeto` — `projectId` nunca muda (critério de aceitação 15). */
@@ -49,8 +84,14 @@ export async function deleteProject(projectId: string): Promise<void> {
   });
 }
 
-export async function getFieldLogsByProject(projectId: string): Promise<FieldLog[]> {
+/** Registros de campo como gravados — usado pelo checkpoint. */
+export async function getFieldLogsBrutos(projectId: string): Promise<FieldLog[]> {
   return db.fieldLogs.where('projectId').equals(projectId).toArray();
+}
+
+export async function getFieldLogsByProject(projectId: string): Promise<FieldLog[]> {
+  const [logs, cadastros] = await Promise.all([getFieldLogsBrutos(projectId), getCadastrosSolucao(projectId)]);
+  return logs.map((l) => ({ ...l, solucoesCampo: aplicarCadastros(l.solucoesCampo, cadastros) }));
 }
 
 export function fieldLogKey(estacaId: number, faixa: number): string {
@@ -126,7 +167,7 @@ export async function getFieldChangeHistoryByProject(projectId: string): Promise
  * GPS nem em qual estaca é a ativa, só em registros de solução já salvos.
  */
 export async function reverterEvento(eventoId: number): Promise<void> {
-  await db.transaction('rw', db.fieldChangeHistory, db.fieldLogs, db.stations, async () => {
+  await db.transaction('rw', db.fieldChangeHistory, db.fieldLogs, db.stations, db.projects, async () => {
     const evento = await db.fieldChangeHistory.get(eventoId);
     if (!evento || evento.revertidoEm) return;
 
@@ -140,7 +181,8 @@ export async function reverterEvento(eventoId: number): Promise<void> {
 
     const estacao = await db.stations.where('[projectId+id]').equals([projectId, estacaId]).first();
     const faixaOriginal = estacao?.faixas.find((f) => f.numero === faixa);
-    const solucaoOriginal = faixaOriginal?.solucoesOriginais ?? [];
+    const cadastros = (await db.projects.get(projectId))?.cadastrosSolucao;
+    const solucaoOriginal = aplicarCadastros(faixaOriginal?.solucoesOriginais ?? [], cadastros);
 
     const novoEstado = calcularEstadoAtualDaCadeia(eventosDaFaixa, solucaoOriginal);
     const fieldLog = await db.fieldLogs.where('[projectId+estacaId+faixa]').equals([projectId, estacaId, faixa]).first();

@@ -6,7 +6,7 @@ export interface EntradaPaleta {
   label: string; // nome completo — usado na legenda, sempre por extenso (seção 6)
   labelCurto: string; // só pro badge compacto (seção 10) — nunca substitui o nome completo na legenda
   cor: string;
-  origem: 'legenda oficial' | 'inventada, sem fonte oficial';
+  origem: 'legenda oficial' | 'inventada, sem fonte oficial' | 'cadastrada pelo usuário';
 }
 
 export const PALETA_SOLUCOES: Record<string, EntradaPaleta> = {
@@ -28,7 +28,42 @@ export const CORES_DRENO = {
   ausente: '#C3C2B7',
 } as const;
 
+// Legendas próprias: criadas pelo usuário (nome + cor) pra uma célula de
+// solução que a planilha trouxe e a tabela de normalização não conhece. Ficam
+// fora de PALETA_SOLUCOES de propósito — a paleta oficial continua vindo só da
+// legenda do documento; isto é uma camada por projeto, registrada ao abrir o
+// projeto (ver `registrarLegendasPersonalizadas`) e nunca misturada com as
+// cores oficiais.
+export const PREFIXO_PERSONALIZADA = 'PERSONALIZADA:';
+
+const personalizadas = new Map<string, EntradaPaleta>();
+
+export function chavePersonalizada(categoriaPai: string, textoCelula: string): string {
+  return `${categoriaPai}:${PREFIXO_PERSONALIZADA}${textoCelula}`;
+}
+
+/** Substitui o conjunto inteiro (cada projeto aberto tem o seu). */
+export function registrarLegendasPersonalizadas(
+  cadastros: ReadonlyArray<{ categoriaPai: string; textoCelula: string; nome: string; cor: string }>,
+): void {
+  personalizadas.clear();
+  for (const c of cadastros) {
+    personalizadas.set(chavePersonalizada(c.categoriaPai, c.textoCelula), {
+      label: c.nome,
+      labelCurto: c.nome,
+      cor: c.cor,
+      origem: 'cadastrada pelo usuário',
+    });
+  }
+}
+
+/** Legenda oficial + as próprias do projeto aberto — o que a legenda da régua lista. */
+export function entradasLegenda(): EntradaPaleta[] {
+  return [...Object.values(PALETA_SOLUCOES), ...personalizadas.values()];
+}
+
 export function corSolucao(categoriaPai: string, subtipoCodigo: string): EntradaPaleta {
   if (subtipoCodigo === 'UNKNOWN') return { ...COR_UNKNOWN, origem: 'inventada, sem fonte oficial' };
-  return PALETA_SOLUCOES[`${categoriaPai}:${subtipoCodigo}`] ?? { ...COR_UNKNOWN, origem: 'inventada, sem fonte oficial' };
+  const chave = `${categoriaPai}:${subtipoCodigo}`;
+  return PALETA_SOLUCOES[chave] ?? personalizadas.get(chave) ?? { ...COR_UNKNOWN, origem: 'inventada, sem fonte oficial' };
 }

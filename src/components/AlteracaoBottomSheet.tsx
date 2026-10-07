@@ -142,7 +142,7 @@ export function AlteracaoBottomSheet({ estaca, fieldLogs, faixaInicial, config, 
 
           {estado.naoEditaveis.length > 0 && (
             <p className="mb-3 rounded bg-neutral-100 p-2 text-xs text-neutral-600">
-              {estado.naoEditaveis.length} valor(es) não mapeado(s) (UNKNOWN) desta faixa serão mantidos como estão. Use "Limpar Faixa" pra removê-los.
+              {estado.naoEditaveis.length} solução(ões) fora da lista padrão (não reconhecida ou legenda própria) desta faixa serão mantidas como estão. Use "Limpar Faixa" pra removê-las.
             </p>
           )}
 

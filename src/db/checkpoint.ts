@@ -1,12 +1,13 @@
 import type { Checkpoint, Projeto } from '../types/domain';
 import { db, type StationRow } from './schema';
-import { getFieldLogsByProject, getStations } from './projectService';
+import { getFieldLogsBrutos, getStationsBrutas } from './projectService';
 
 const SCHEMA_VERSION = 1;
 
 export async function buildCheckpoint(projeto: Projeto): Promise<Checkpoint> {
-  const estacas = await getStations(projeto.projectId);
-  const fieldLogs = await getFieldLogsByProject(projeto.projectId);
+  // sempre o dado bruto: os cadastros de solução vão à parte em `cadastrosSolucao`
+  const estacas = await getStationsBrutas(projeto.projectId);
+  const fieldLogs = await getFieldLogsBrutos(projeto.projectId);
   const fieldChangeHistory = await db.fieldChangeHistory.where('projectId').equals(projeto.projectId).toArray();
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -17,6 +18,7 @@ export async function buildCheckpoint(projeto: Projeto): Promise<Checkpoint> {
     estacas,
     fieldLogs,
     fieldChangeHistory,
+    cadastrosSolucao: (await db.projects.get(projeto.projectId))?.cadastrosSolucao ?? [],
     exportedAt: new Date().toISOString(),
   };
 }
@@ -42,6 +44,7 @@ export async function restoreCheckpoint(checkpoint: Checkpoint, options: Restore
     sourceFileName: checkpoint.metadata.localBruto ?? checkpoint.nomeProjeto,
     nomeProjeto: checkpoint.nomeProjeto,
     metadata: checkpoint.metadata,
+    cadastrosSolucao: checkpoint.cadastrosSolucao ?? [],
   };
   const stations: StationRow[] = checkpoint.estacas.map((e) => ({ ...e, projectId: checkpoint.projectId }));
 

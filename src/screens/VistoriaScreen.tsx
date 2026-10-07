@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Estaca, FieldChangeHistoryEntry, FieldLog, NormalizedSolution, Projeto } from '../types/domain';
-import type { NormalizationConfig } from '../services/normalizer';
+import type { CadastroSolucao, Estaca, FieldChangeHistoryEntry, FieldLog, NormalizedSolution, Projeto } from '../types/domain';
+import { catalogoSubtipos, type NormalizationConfig } from '../services/normalizer';
+import { registrarLegendasPersonalizadas } from '../config/paleta';
+import { legendasPersonalizadasDe } from '../services/cadastroSolucoes';
 import {
   getProject,
+  salvarCadastroSolucao,
+  removerCadastroSolucao,
   getStations,
   getFieldLogsMap,
   applyFieldChange,
@@ -112,7 +116,13 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
   }, [colunaDireitaEl]);
 
   useEffect(() => {
-    getProject(projectId).then((p) => setProjeto(p ?? null));
+    getProject(projectId).then((p) => {
+      // registra as legendas próprias do projeto antes de setProjeto: a tela só
+      // renderiza o conteúdo quando projeto + estacas existem, então as cores
+      // já estão registradas no primeiro desenho.
+      registrarLegendasPersonalizadas(legendasPersonalizadasDe(p?.cadastrosSolucao));
+      setProjeto(p ?? null);
+    });
     getStations(projectId).then((e) => setEstacas(e.sort((a, b) => a.id - b.id)));
     getFieldLogsMap(projectId).then(setFieldLogs);
     getFieldChangeHistoryByProject(projectId).then(setHistorico);
@@ -134,7 +144,25 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
   // sinalizadas pra correção do cadastro, nunca "adivinhadas" pelo app.
   const errosCadastrais = useMemo(() => coletarErrosCadastrais(estacas ?? []), [estacas]);
   const totalErrosCadastrais = errosCadastrais.reduce((soma, g) => soma + g.ocorrencias, 0);
+  const cadastrosFeitos = projeto?.cadastrosSolucao ?? [];
   const [errosAbertos, setErrosAbertos] = useState(false);
+
+  async function recarregarAposCadastro() {
+    const [p, e, logs] = await Promise.all([getProject(projectId), getStations(projectId), getFieldLogsMap(projectId)]);
+    // legendas próprias registradas antes dos setState, no mesmo lote de render
+    registrarLegendasPersonalizadas(legendasPersonalizadasDe(p?.cadastrosSolucao));
+    setProjeto(p ?? null);
+    setEstacas(e.sort((a, b) => a.id - b.id));
+    setFieldLogs(logs);
+  }
+  async function salvarCadastro(cadastro: CadastroSolucao) {
+    await salvarCadastroSolucao(projectId, cadastro);
+    await recarregarAposCadastro();
+  }
+  async function desfazerCadastro(cadastro: CadastroSolucao) {
+    await removerCadastroSolucao(projectId, cadastro.categoriaPai, cadastro.textoCelula);
+    await recarregarAposCadastro();
+  }
   const gps = useGps(estacasGps, 0);
   useWakeLock(true);
   const municipioAtual = useMunicipioAtual(gps.sessaoInfo.latitude, gps.sessaoInfo.longitude);
@@ -181,13 +209,15 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
           ← Projetos
         </button>
         <h1 className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-neutral-900">{projeto.nomeProjeto}</h1>
-        {errosCadastrais.length > 0 && (
+        {(errosCadastrais.length > 0 || cadastrosFeitos.length > 0) && (
           <button
             onClick={() => setErrosAbertos(true)}
             aria-label={`Erros cadastrais: ${totalErrosCadastrais} solução(ões) não reconhecida(s)`}
-            className="flex h-10 shrink-0 items-center gap-1 rounded-lg border border-amber-500 bg-amber-50 px-2 text-sm font-bold text-amber-800"
+            className={`flex h-10 shrink-0 items-center gap-1 rounded-lg border px-2 text-sm font-bold ${
+              totalErrosCadastrais > 0 ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-neutral-300 bg-white text-neutral-600'
+            }`}
           >
-            <span aria-hidden>⚠</span>
+            <span aria-hidden>{totalErrosCadastrais > 0 ? '⚠' : '✓'}</span>
             {totalErrosCadastrais}
           </button>
         )}
@@ -350,7 +380,16 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
 
       {modo === 'alteracoes' && <AlteracoesTab estacas={estacas} historico={historico} onReverter={reverter} />}
 
-      {errosAbertos && <ErrosCadastraisPanel grupos={errosCadastrais} onFechar={() => setErrosAbertos(false)} />}
+      {errosAbertos && (
+        <ErrosCadastraisPanel
+          grupos={errosCadastrais}
+          cadastros={cadastrosFeitos}
+          legendas={catalogoSubtipos(config)}
+          onSalvar={salvarCadastro}
+          onRemover={desfazerCadastro}
+          onFechar={() => setErrosAbertos(false)}
+        />
+      )}
 
       {faixaEmEdicao != null && (
         <AlteracaoBottomSheet
