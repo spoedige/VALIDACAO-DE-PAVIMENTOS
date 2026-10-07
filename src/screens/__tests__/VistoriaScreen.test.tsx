@@ -352,3 +352,35 @@ describe('VistoriaScreen — régua observa a altura real da coluna (mesmo após
     vi.unstubAllGlobals();
   });
 });
+
+// Erros cadastrais: solução que o normalizador não reconheceu (UNKNOWN) vira
+// um alerta visível na Vistoria, com o texto exato da célula da planilha.
+describe('VistoriaScreen — erros cadastrais (solução UNKNOWN)', () => {
+  function estacaComUnknown(id: number, valor: string | number): Estaca {
+    return {
+      ...estaca(id),
+      faixas: [{ numero: 1, parametros: {}, solucoesOriginais: [{ categoriaPai: 'Revest', subtipoCodigo: 'UNKNOWN', valorBruto: valor, normalizationStatus: 'unresolved' }] }],
+    };
+  }
+
+  it('mostra o botão com a contagem e abre a lista com o texto da célula', async () => {
+    const user = userEvent.setup();
+    const projectId = await createProjectFromImport(buildImportResult([estacaComUnknown(0, 3), estacaComUnknown(1, 3)]));
+    render(<VistoriaScreen projectId={projectId} config={CONFIG} limiaresTolerancia={null} onVoltar={() => {}} onExportar={() => {}} />);
+
+    await waitFor(() => expect(screen.getByText('Alterar')).toBeInTheDocument());
+    // o chip da estaca ativa já mostra o ícone + texto da célula
+    expect(screen.getAllByRole('img', { name: 'Erro cadastral' }).length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole('button', { name: /Erros cadastrais: 2/ }));
+    expect(await screen.findByText('Erros cadastrais (2)')).toBeInTheDocument();
+    expect(screen.getByText(/Coluna "Revest\.": célula "3"/)).toBeInTheDocument();
+  });
+
+  it('sem solução desconhecida, o botão de erros cadastrais não aparece', async () => {
+    const projectId = await createProjectFromImport(buildImportResult([estaca(0)]));
+    render(<VistoriaScreen projectId={projectId} config={CONFIG} limiaresTolerancia={null} onVoltar={() => {}} onExportar={() => {}} />);
+    await waitFor(() => expect(screen.getByText('Alterar')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /Erros cadastrais/ })).not.toBeInTheDocument();
+  });
+});

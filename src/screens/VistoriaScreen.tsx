@@ -17,6 +17,8 @@ import { useMunicipioAtual } from '../hooks/useMunicipioAtual';
 import { FaixaCard } from '../components/FaixaCard';
 import { AlteracaoBottomSheet } from '../components/AlteracaoBottomSheet';
 import { AlteracoesTab } from '../components/AlteracoesTab';
+import { ErrosCadastraisPanel } from '../components/ErrosCadastraisPanel';
+import { coletarErrosCadastrais } from '../services/errosCadastrais';
 import { VerticalRuler } from '../components/VerticalRuler';
 import { ParametrosTable } from '../components/ParametrosTable';
 import { DashboardScreen } from './DashboardScreen';
@@ -128,6 +130,11 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
     () => (estacas ?? []).map((e, i) => ({ index: i, latitude: e.latitude, longitude: e.longitude, hodometroContinuo: e.hodometroContinuo })),
     [estacas],
   );
+  // soluções da planilha que o normalizador não reconheceu (UNKNOWN) —
+  // sinalizadas pra correção do cadastro, nunca "adivinhadas" pelo app.
+  const errosCadastrais = useMemo(() => coletarErrosCadastrais(estacas ?? []), [estacas]);
+  const totalErrosCadastrais = errosCadastrais.reduce((soma, g) => soma + g.ocorrencias, 0);
+  const [errosAbertos, setErrosAbertos] = useState(false);
   const gps = useGps(estacasGps, 0);
   useWakeLock(true);
   const municipioAtual = useMunicipioAtual(gps.sessaoInfo.latitude, gps.sessaoInfo.longitude);
@@ -174,6 +181,16 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
           ← Projetos
         </button>
         <h1 className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-neutral-900">{projeto.nomeProjeto}</h1>
+        {errosCadastrais.length > 0 && (
+          <button
+            onClick={() => setErrosAbertos(true)}
+            aria-label={`Erros cadastrais: ${totalErrosCadastrais} solução(ões) não reconhecida(s)`}
+            className="flex h-10 shrink-0 items-center gap-1 rounded-lg border border-amber-500 bg-amber-50 px-2 text-sm font-bold text-amber-800"
+          >
+            <span aria-hidden>⚠</span>
+            {totalErrosCadastrais}
+          </button>
+        )}
         <button onClick={() => onExportar(projectId)} className="h-10 shrink-0 rounded-lg bg-ocre px-3 text-sm font-bold text-white">
           Exportar
         </button>
@@ -332,6 +349,8 @@ export function VistoriaScreen({ projectId, config, limiaresTolerancia, onVoltar
       {modo === 'parametros' && <ParametrosTable estaca={estacaAtiva} />}
 
       {modo === 'alteracoes' && <AlteracoesTab estacas={estacas} historico={historico} onReverter={reverter} />}
+
+      {errosAbertos && <ErrosCadastraisPanel grupos={errosCadastrais} onFechar={() => setErrosAbertos(false)} />}
 
       {faixaEmEdicao != null && (
         <AlteracaoBottomSheet

@@ -25,7 +25,7 @@ export function SolutionBadge({ solucao, compacto }: Props) {
   const { labelCurto, label, cor } = corSolucao(solucao.categoriaPai, solucao.subtipoCodigo);
   const unresolved = solucao.normalizationStatus === 'unresolved';
   const complementar = unresolved ? String(solucao.valorBruto) : formatarComplementar(solucao.valorComplementar);
-  const titulo = unresolved ? `Não reconhecido — valor original: ${solucao.valorBruto}` : label;
+  const titulo = unresolved ? `Erro cadastral — solução não reconhecida. Texto da célula: "${solucao.valorBruto}"` : label;
 
   return (
     <span
@@ -33,13 +33,21 @@ export function SolutionBadge({ solucao, compacto }: Props) {
       className={`inline-flex max-w-full items-center gap-1 overflow-hidden rounded-full border bg-white font-bold text-neutral-800 ${
         compacto ? 'h-5 px-1.5 text-[10px]' : 'h-7 px-2 text-sm'
       }`}
-      style={{ borderColor: cor }}
+      style={{ borderColor: unresolved ? '#d97706' : cor }}
     >
-      <span aria-hidden className={`shrink-0 rounded-full ${compacto ? 'h-1.5 w-1.5' : 'h-2 w-2'}`} style={{ backgroundColor: cor }} />
+      {unresolved ? (
+        // ícone de erro cadastral no lugar da bolinha de cor: solução que o
+        // app não conhece nunca ganha cor inventada, só o alerta + texto da célula
+        <span role="img" aria-label="Erro cadastral" className="shrink-0 text-amber-600">
+          ⚠
+        </span>
+      ) : (
+        <span aria-hidden className={`shrink-0 rounded-full ${compacto ? 'h-1.5 w-1.5' : 'h-2 w-2'}`} style={{ backgroundColor: cor }} />
+      )}
       {/* item 6: dentro de uma coluna de largura fixa (painel de consulta), o
           nome precisa truncar, nunca empurrar a coluna vizinha */}
       <span className="truncate">{unresolved ? 'UNKNOWN' : labelCurto}</span>
-      {complementar && <span className="shrink-0 font-normal text-neutral-500">· {complementar}</span>}
+      {complementar && <span className="shrink-0 font-normal text-neutral-500">· {unresolved ? `"${complementar}"` : complementar}</span>}
     </span>
   );
 }
